@@ -2,69 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Coco Clan - Pro Strategy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
+    <title>Coco Clan - Pro Builder</title>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
     <style>
-        :root { --gold: #f1c40f; --wood: #e67e22; --border: #fff; }
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Fredoka One', cursive; user-select: none; -webkit-tap-highlight-color: transparent; }
-        canvas { display: block; background: #458a3c; }
+        :root { --gold: #f1c40f; --wood: #e67e22; --grass: #458a3c; }
+        body { margin: 0; background: #222; overflow: hidden; font-family: 'Fredoka One', cursive; user-select: none; }
+        
+        /* Landscape Warning - screen එක හරවන්න කියන එක */
+        @media screen and (orientation: portrait) {
+            #rotate-msg { display: flex; }
+        }
+        #rotate-msg { display: none; position: fixed; inset: 0; background: #1a1a1a; color: white; z-index: 10000; align-items: center; justify-content: center; text-align: center; padding: 20px; }
 
-        /* Top Resources Bar */
-        .ui-top { position: fixed; top: 10px; left: 0; width: 100%; display: flex; justify-content: center; gap: 10px; z-index: 1000; }
-        .res-pill { background: rgba(0,0,0,0.7); border: 2px solid var(--border); border-radius: 20px; padding: 5px 15px; color: white; display: flex; align-items: center; gap: 8px; font-size: 14px; min-width: 90px; }
-        .res-pill img { width: 20px; }
+        canvas { display: block; background: var(--grass); }
 
-        /* Level Indicator */
-        .lvl-badge { position: fixed; top: 10px; left: 15px; width: 50px; height: 50px; background: #2980b9; border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; z-index: 1001; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        /* UI Styling */
+        .top-bar { position: fixed; top: 10px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 100; }
+        .res-pill { background: rgba(0,0,0,0.8); border: 2px solid #fff; border-radius: 20px; padding: 5px 20px; color: #fff; display: flex; align-items: center; gap: 10px; font-size: 16px; }
+        .res-pill img { width: 24px; }
 
-        /* Building Menu (CoC Style) */
-        .shop-btn { position: fixed; bottom: 20px; right: 20px; width: 80px; height: 80px; background: #2ecc71; border: 4px solid #fff; border-radius: 50%; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 0 #27ae60; }
-        .shop-btn img { width: 45px; }
+        .th-badge { position: fixed; top: 10px; left: 15px; background: #d35400; border: 3px solid #fff; border-radius: 15px; padding: 5px 15px; color: #fff; z-index: 100; }
 
-        #build-menu { display: none; position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; background: rgba(44, 62, 80, 0.95); border: 4px solid var(--gold); border-radius: 25px; padding: 15px; z-index: 1001; }
-        .grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-        .build-card { background: #34495e; border-radius: 15px; padding: 10px; text-align: center; border: 2px solid transparent; }
-        .build-card:active { transform: scale(0.95); border-color: var(--gold); }
-        .build-card img { width: 40px; height: 40px; }
-        .build-card h5 { margin: 5px 0; font-size: 12px; color: white; }
-        .price { font-size: 10px; color: var(--gold); }
+        /* Bottom Controls */
+        .shop-btn { position: fixed; bottom: 20px; right: 20px; width: 80px; height: 80px; background: #2ecc71; border: 4px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; box-shadow: 0 6px 0 #27ae60; cursor: pointer; z-index: 1000; }
+        
+        #shop-panel { display: none; position: fixed; bottom: 110px; right: 20px; width: 300px; background: #2c3e50; border: 4px solid var(--gold); border-radius: 20px; padding: 15px; z-index: 1001; color: white; }
+        .item { background: #34495e; margin: 5px 0; padding: 10px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .item:active { background: #1abc9c; }
 
-        #alert { position: fixed; top: 80px; width: 100%; text-align: center; color: #fff; font-size: 18px; text-shadow: 2px 2px #000; pointer-events: none; z-index: 2000; }
+        #msg { position: fixed; top: 80px; width: 100%; text-align: center; color: white; font-size: 20px; text-shadow: 2px 2px #000; z-index: 500; pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div id="alert"></div>
+<div id="rotate-msg"><h1>PLEASE ROTATE YOUR PHONE TO LANDSCAPE MODE 📱🔄</h1></div>
 
-<div class="lvl-badge" id="player-lvl">1</div>
+<div id="msg"></div>
 
-<div class="ui-top">
-    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/2991/2991151.png"> <span id="gold-val">500</span></div>
-    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/489/489969.png"> <span id="wood-val">200</span></div>
-    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/1170/1170611.png"> <span id="builder-val">1/2</span></div>
+<div class="th-badge">TOWN HALL LVL <span id="ui-th-lvl">1</span></div>
+
+<div class="top-bar">
+    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/2991/2991151.png"> <span id="ui-gold">500</span></div>
+    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/489/489969.png"> <span id="ui-wood">0</span></div>
 </div>
 
-<div id="build-menu">
-    <div class="grid-container">
-        <div class="build-card" onclick="selectItem('house', 250, 100)">
-            <img src="https://cdn-icons-png.flaticon.com/512/619/619153.png">
-            <h5>CAMP</h5><div class="price">250G</div>
-        </div>
-        <div class="build-card" onclick="selectItem('factory', 600, 300)">
-            <img src="https://cdn-icons-png.flaticon.com/512/1006/1006771.png">
-            <h5>FACTORY</h5><div class="price">600G</div>
-        </div>
-        <div class="build-card" onclick="selectItem('hospital', 400, 200)">
-            <img src="https://cdn-icons-png.flaticon.com/512/2966/2966327.png">
-            <h5>CLINIC</h5><div class="price">400G</div>
-        </div>
-    </div>
+<div id="shop-panel">
+    <h3 style="margin:0 0 10px 0; text-align:center;">BUILDINGS</h3>
+    <div class="item" onclick="prepareBuild('house', 200, 50)"><span>🏠 HOUSE</span> <b>200G</b></div>
+    <div class="item" onclick="prepareBuild('factory', 600, 200)"><span>🏭 FACTORY</span> <b>600G</b></div>
+    <div class="item" onclick="prepareBuild('hospital', 400, 150)"><span>🏥 CLINIC</span> <b>400G</b></div>
+    <div class="item" onclick="upgradeTH()" style="background:#e67e22"><span>⬆️ UPGRADE TH</span> <b id="ui-up-cost">1000G</b></div>
 </div>
 
-<div class="shop-btn" onclick="toggleMenu()">
-    <img src="https://cdn-icons-png.flaticon.com/512/1170/1170577.png">
-</div>
+<div class="shop-btn" onclick="toggleShop()">🏗️</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -74,126 +65,128 @@
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    // Game Variables
-    let state = { gold: 1000, wood: 500, lvl: 1, builders: 2, busyBuilders: 0 };
-    let camera = { x: canvas.width/2, y: canvas.height/4, zoom: 1 };
-    let buildings = [], trees = [], particles = [];
-    let currentPlacing = null;
+    let res = { gold: 500, wood: 0, thLvl: 1 };
+    let camera = { x: canvas.width/2, y: canvas.height/4 };
+    let player = { x: 0, y: 0, tx: 0, ty: 0, speed: 3 };
+    let buildings = [], trees = [];
+    let currentPlacing = null, isDragging = false, lastX, lastY;
 
-    // Load Assets (Placeholder Images - Replace with your own sprites later)
-    const sprites = {
-        house: "https://cdn-icons-png.flaticon.com/512/619/619153.png",
-        factory: "https://cdn-icons-png.flaticon.com/512/1006/1006771.png",
-        tree: "https://cdn-icons-png.flaticon.com/512/489/489969.png",
-        man: "https://cdn-icons-png.flaticon.com/512/1995/1995574.png"
-    };
+    // Assets
+    const imgTH = "https://cdn-icons-png.flaticon.com/512/3062/3062334.png";
+    const imgTree = "https://cdn-icons-png.flaticon.com/512/489/489969.png";
+    const imgMan = "https://cdn-icons-png.flaticon.com/512/1995/1995574.png";
 
-    // Initialize Map with Forest
+    // Setup Map
+    buildings.push({ x: 0, y: 0, type: 'townhall', isDone: true });
     for(let i=0; i<30; i++) {
-        trees.push({ x: Math.random()*1200-600, y: Math.random()*1200-600, type: 'tree' });
+        trees.push({ x: Math.round((Math.random()*1200-600)/60)*60, y: Math.round((Math.random()*1200-600)/60)*60, hp: 100 });
     }
 
     function toIso(x, y) {
-        return {
-            x: (x - y) + camera.x,
-            y: (x + y) / 2 + camera.y
-        };
+        return { ix: (x - y) + camera.x, iy: (x + y) / 2 + camera.y };
     }
 
-    function toggleMenu() {
-        const m = document.getElementById('build-menu');
-        m.style.display = m.style.display === 'block' ? 'none' : 'block';
+    function showMsg(m) { document.getElementById('msg').innerText = m; setTimeout(()=>document.getElementById('msg').innerText="", 3000); }
+    function toggleShop() { const p = document.getElementById('shop-panel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; }
+
+    function prepareBuild(type, g, w) {
+        if(res.gold >= g) { currentPlacing = { type, g, w }; toggleShop(); showMsg("TAP ON GROUND TO PLACE!"); }
+        else { showMsg("NEED MORE GOLD! ❌"); }
     }
 
-    function selectItem(type, g, w) {
-        if(state.gold >= g && state.builders > state.busyBuilders) {
-            currentPlacing = { type, g, w, progress: 0 };
-            toggleMenu();
-        } else {
-            showAlert("NOT ENOUGH GOLD OR BUILDERS!");
-        }
+    function upgradeTH() {
+        let cost = res.thLvl * 1000;
+        if(res.gold >= cost && res.thLvl < 10) {
+            res.gold -= cost; res.thLvl++;
+            showMsg("TOWN HALL UPGRADED TO LVL " + res.thLvl);
+            document.getElementById('ui-up-cost').innerText = (res.thLvl * 1000) + "G";
+        } else { showMsg("NOT ENOUGH GOLD!"); }
     }
 
-    function showAlert(m) {
-        const a = document.getElementById('alert');
-        a.innerText = m; setTimeout(() => a.innerText="", 3000);
-    }
-
-    // Touch & Mouse Handling
-    let isDragging = false, lastX, lastY;
+    // Input Handling
     canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
-    window.addEventListener('mousemove', e => {
-        if(isDragging) {
-            camera.x += e.clientX - lastX;
-            camera.y += e.clientY - lastY;
-            lastX = e.clientX; lastY = e.clientY;
-        }
-    });
+    window.addEventListener('mousemove', e => { if(isDragging) { camera.x += e.clientX-lastX; camera.y += e.clientY-lastY; lastX = e.clientX; lastY = e.clientY; } });
     window.addEventListener('mouseup', e => {
-        if(currentPlacing && !isDragging) {
+        if(!isDragging || Math.abs(e.clientX - lastX) < 5) {
             let mx = e.clientX - camera.x, my = (e.clientY - camera.y) * 2;
             let gx = Math.round(((my+mx)/2)/60)*60;
             let gy = Math.round(((my-mx)/2)/60)*60;
-            
-            state.gold -= currentPlacing.g;
-            state.busyBuilders++;
-            buildings.push({ x: gx, y: gy, type: currentPlacing.type, progress: 0, lvl: 1, isDone: false });
-            currentPlacing = null;
+
+            if(currentPlacing) {
+                res.gold -= currentPlacing.g;
+                buildings.push({ x: gx, y: gy, type: currentPlacing.type, progress: 0, isDone: false });
+                player.tx = gx; player.ty = gy;
+                currentPlacing = null;
+            } else {
+                player.tx = gx; player.ty = gy;
+            }
         }
         isDragging = false;
     });
 
-    function drawBuilding(b) {
-        let p = toIso(b.x, b.y);
-        let img = new Image(); img.src = sprites[b.type] || sprites.house;
-        
-        // Draw Shadow
-        ctx.fillStyle = "rgba(0,0,0,0.2)";
-        ctx.beginPath(); ctx.ellipse(p.x, p.y, 30, 15, 0, 0, Math.PI*2); ctx.fill();
-
-        // Draw Building
-        ctx.drawImage(img, p.x-30, p.y-50, 60, 60);
-
-        if(!b.isDone) {
-            b.progress += 0.2;
-            ctx.fillStyle = "#000"; ctx.fillRect(p.x-25, p.y-65, 50, 6);
-            ctx.fillStyle = "#2ecc71"; ctx.fillRect(p.x-25, p.y-65, b.progress/2, 6);
-            if(b.progress >= 100) { b.isDone = true; state.busyBuilders--; }
-        }
+    function drawSprite(url, x, y, size) {
+        let p = toIso(x, y);
+        let img = new Image(); img.src = url;
+        ctx.drawImage(img, p.ix - size/2, p.iy - size, size, size);
     }
 
-    function gameLoop() {
+    function update() {
+        // Player Move
+        let dx = player.tx - player.x, dy = player.ty - player.y;
+        let dist = Math.hypot(dx, dy);
+        if(dist > 2) {
+            player.x += (dx / dist) * player.speed;
+            player.y += (dy / dist) * player.speed;
+        }
+
+        // Wood Cutting Logic
+        trees.forEach((t, i) => {
+            if(Math.hypot(player.x - t.x, player.y - t.y) < 40) {
+                t.hp -= 0.5;
+                if(Math.random() > 0.95) { res.wood += 2; res.gold += 1; }
+                if(t.hp <= 0) trees.splice(i, 1);
+            }
+        });
+
+        // UI Refresh
+        document.getElementById('ui-gold').innerText = Math.floor(res.gold);
+        document.getElementById('ui-wood').innerText = Math.floor(res.wood);
+        document.getElementById('ui-th-lvl').innerText = res.thLvl;
+    }
+
+    function render() {
         ctx.clearRect(0,0,canvas.width, canvas.height);
         
-        // Draw Grass Grid
-        ctx.strokeStyle = "rgba(255,255,255,0.05)";
-        for(let i=-800; i<=800; i+=60) {
-            for(let j=-800; j<=800; j+=60) {
+        // Grid
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        for(let i=-600; i<=600; i+=60) {
+            for(let j=-600; j<=600; j+=60) {
                 let p = toIso(i, j);
-                ctx.beginPath(); ctx.moveTo(p.x, p.y-15); ctx.lineTo(p.x+30, p.y); ctx.lineTo(p.x, p.y+15); ctx.lineTo(p.x-30, p.y); ctx.closePath(); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(p.ix, p.iy-15); ctx.lineTo(p.ix+30, p.iy); ctx.lineTo(p.ix, p.iy+15); ctx.lineTo(p.ix-30, p.iy); ctx.closePath(); ctx.stroke();
             }
         }
 
-        // Draw Trees
-        trees.forEach(t => {
-            let p = toIso(t.x, t.y);
-            let img = new Image(); img.src = sprites.tree;
-            ctx.drawImage(img, p.x-20, p.y-35, 40, 40);
+        trees.forEach(t => drawSprite(imgTree, t.x, t.y, 50));
+        
+        buildings.forEach(b => {
+            drawSprite(imgTH, b.x, b.y, 70);
+            if(!b.isDone) {
+                b.progress += 0.2; let p = toIso(b.x, b.y);
+                ctx.fillStyle = "#000"; ctx.fillRect(p.ix-20, p.iy-75, 40, 6);
+                ctx.fillStyle = "#2ecc71"; ctx.fillRect(p.ix-20, p.iy-75, b.progress * 0.4, 6);
+                if(b.progress >= 100) b.isDone = true;
+            }
         });
 
-        // Draw Buildings
-        buildings.forEach(drawBuilding);
+        drawSprite(imgMan, player.x, player.y, 45); // මනුස්සයා (The Builder)
 
-        // Update UI
-        document.getElementById('gold-val').innerText = Math.floor(state.gold);
-        document.getElementById('wood-val').innerText = Math.floor(state.wood);
-        document.getElementById('builder-val').innerText = `${state.builders - state.busyBuilders}/${state.builders}`;
-        document.getElementById('player-lvl').innerText = state.lvl;
-
-        requestAnimationFrame(gameLoop);
+        update();
+        requestAnimationFrame(render);
     }
 
-    gameLoop();
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    render();
+    showMsg("CLICK ON A TREE TO START CUTTING! 🌲");
 </script>
 </body>
 </html>
