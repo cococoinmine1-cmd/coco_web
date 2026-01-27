@@ -3,66 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, orientation=landscape">
-    <title>Coco Clan - Pro Strategy Engine</title>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
+    <title>Coco Clan - Pro Version</title>
     <style>
-        :root { --gold: #f1c40f; --elixir: #9b59b6; --ui-bg: rgba(44, 62, 80, 0.9); }
-        body { margin: 0; background: #222; overflow: hidden; font-family: 'Fredoka One', cursive; user-select: none; }
-        
-        canvas { display: block; background: #458a3c; cursor: grab; }
+        :root { --gold: #f1c40f; --dark-blue: #2c3e50; }
+        body { margin: 0; background: #1b3d1b; overflow: hidden; font-family: 'Arial Black', sans-serif; user-select: none; }
+        canvas { display: block; cursor: grab; }
 
-        /* HUD UI */
-        .hud { position: fixed; top: 15px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
-        .res-pill { background: var(--ui-bg); border: 2px solid #fff; border-radius: 25px; padding: 5px 20px; color: white; display: flex; align-items: center; justify-content: space-between; min-width: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        .res-pill img { width: 22px; }
+        /* CoC Styled Resource Bar */
+        .res-container { position: fixed; top: 15px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
+        .res-bar { background: rgba(0,0,0,0.8); border: 2px solid #fff; border-radius: 20px; width: 180px; height: 35px; display: flex; align-items: center; padding: 0 10px; position: relative; }
+        .res-bar img { width: 30px; position: absolute; left: -15px; filter: drop-shadow(0 0 5px rgba(0,0,0,0.5)); }
+        .res-text { width: 100%; text-align: right; color: white; font-size: 18px; text-shadow: 2px 2px #000; }
+        .res-fill { height: 10px; background: var(--gold); position: absolute; bottom: 5px; left: 20px; right: 10px; border-radius: 5px; opacity: 0.3; }
 
-        .th-lvl { position: fixed; top: 15px; left: 15px; background: #e67e22; border: 3px solid #fff; border-radius: 15px; padding: 8px 15px; color: white; text-align: center; z-index: 1000; }
+        /* Level Badge */
+        .lvl-badge { position: fixed; top: 15px; left: 20px; width: 60px; height: 60px; background: url('https://i.imgur.com/8Q8pY7W.png') no-repeat center; background-size: contain; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; z-index: 1000; }
 
-        /* Build Menu */
-        .bottom-controls { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 1000; }
-        .shop-btn { width: 85px; height: 85px; background: #2ecc71; border: 4px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 35px; box-shadow: 0 6px 0 #27ae60; cursor: pointer; }
-        
-        #shop-menu { display: none; position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); width: 85%; max-width: 600px; background: var(--ui-bg); border: 4px solid var(--gold); border-radius: 25px; padding: 20px; z-index: 1001; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 15px; }
-        .item { background: #34495e; border-radius: 15px; padding: 15px; text-align: center; border-bottom: 5px solid rgba(0,0,0,0.4); }
-        .item img { width: 50px; height: 50px; }
-        .item h5 { margin: 5px 0; color: #fff; font-size: 14px; }
-        .item span { color: var(--gold); font-size: 12px; }
+        /* Shop & Bottom UI */
+        .bottom-ui { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 1000; }
+        .btn-shop { width: 90px; height: 90px; background: url('https://i.imgur.com/GzB9pS0.png') no-repeat center; background-size: cover; border: none; cursor: pointer; transition: transform 0.1s; }
+        .btn-shop:active { transform: scale(0.9); }
 
-        #alert { position: fixed; top: 100px; width: 100%; text-align: center; color: white; font-size: 22px; text-shadow: 2px 2px #000; z-index: 2000; pointer-events: none; }
+        #shop-menu { display: none; position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 700px; background: var(--dark-blue); border: 5px solid #f1c40f; border-radius: 20px; padding: 20px; z-index: 2000; color: white; }
+        .shop-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .shop-item { background: #34495e; border-radius: 15px; padding: 15px; text-align: center; border-bottom: 5px solid #1a252f; }
+        .shop-item img { width: 60px; height: 60px; }
     </style>
 </head>
 <body>
 
-<div id="alert"></div>
+<div class="lvl-badge" id="th-level">1</div>
 
-<div class="th-lvl">TOWN HALL<br><span style="font-size: 24px;">LVL <span id="ui-th-lvl">1</span></span></div>
-
-<div class="hud">
-    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/2991/2991151.png"> <span id="ui-gold">1000</span></div>
-    <div class="res-pill"><img src="https://cdn-icons-png.flaticon.com/512/489/489969.png"> <span id="ui-wood">500</span></div>
+<div class="res-container">
+    <div class="res-bar">
+        <img src="https://i.imgur.com/5lS3GvY.png" alt="Gold">
+        <div class="res-text" id="ui-gold">1,000</div>
+        <div class="res-fill"></div>
+    </div>
+    <div class="res-bar">
+        <img src="https://i.imgur.com/Tj2rF6Q.png" alt="Wood">
+        <div class="res-text" id="ui-wood">500</div>
+        <div class="res-fill" style="background: #e67e22;"></div>
+    </div>
 </div>
 
 <div id="shop-menu">
-    <div class="grid">
-        <div class="item" onclick="prepareBuild('goldmine', 500, 200)">
-            <img src="https://cdn-icons-png.flaticon.com/512/2991/2991151.png">
-            <h5>GOLD MINE</h5><span>500G</span>
+    <div class="shop-grid">
+        <div class="shop-item" onclick="prepareBuild('goldmine', 500)">
+            <img src="https://i.imgur.com/vH95F2m.png"><br>GOLD MINE<br><span>500 🪙</span>
         </div>
-        <div class="item" onclick="prepareBuild('barracks', 800, 400)">
-            <img src="https://cdn-icons-png.flaticon.com/512/1006/1006771.png">
-            <h5>BARRACKS</h5><span>800G</span>
+        <div class="shop-item" onclick="prepareBuild('barracks', 1000)">
+            <img src="https://i.imgur.com/pYI7j5Y.png"><br>BARRACKS<br><span>1000 🪙</span>
         </div>
-        <div class="item" onclick="upgradeTH()">
-            <img src="https://cdn-icons-png.flaticon.com/512/3062/3062334.png">
-            <h5>UPGRADE TH</h5><span id="up-cost">2000G</span>
+        <div class="shop-item" onclick="prepareBuild('defense', 1500)">
+            <img src="https://i.imgur.com/Vp6qH3P.png"><br>CANNON<br><span>1500 🪙</span>
+        </div>
+        <div class="shop-item" onclick="upgradeTH()">
+            <img src="https://i.imgur.com/U6OQ9nZ.png"><br>UPGRADE TH<br><span id="up-cost">2000 🪙</span>
         </div>
     </div>
 </div>
 
-<div class="bottom-controls">
-    <div class="shop-btn" onclick="toggleShop()">🏘️</div>
-    <div class="shop-btn" style="background: #e67e22; border-color: #fff;" onclick="saveGame()">💾</div>
+<div class="bottom-ui">
+    <div class="btn-shop" onclick="toggleShop()"></div>
 </div>
 
 <canvas id="gameCanvas"></canvas>
@@ -74,93 +77,95 @@
     canvas.height = window.innerHeight;
 
     let res = { gold: 1000, wood: 500, thLvl: 1 };
-    let cam = { x: canvas.width/2, y: canvas.height/4, zoom: 1 };
+    let camera = { x: canvas.width / 2, y: canvas.height / 4, zoom: 1 };
     let buildings = [], trees = [], soldiers = [];
-    let player = { x: 0, y: 0, tx: 0, ty: 0, speed: 2 };
-    let placing = null, isDragging = false, lastX, lastY;
+    let placingMode = null;
 
-    // Assets
+    // CoC Assets Mapping
     const ASSETS = {
-        th: "https://cdn-icons-png.flaticon.com/512/3062/3062334.png",
-        tree: "https://cdn-icons-png.flaticon.com/512/489/489969.png",
-        worker: "https://cdn-icons-png.flaticon.com/512/1995/1995574.png",
-        mine: "https://cdn-icons-png.flaticon.com/512/2991/2991151.png",
-        barracks: "https://cdn-icons-png.flaticon.com/512/1006/1006771.png"
+        th: "https://i.imgur.com/U6OQ9nZ.png",
+        goldmine: "https://i.imgur.com/vH95F2m.png",
+        barracks: "https://i.imgur.com/pYI7j5Y.png",
+        defense: "https://i.imgur.com/Vp6qH3P.png",
+        tree: "https://i.imgur.com/N6x4p39.png",
+        worker: "https://i.imgur.com/7YV9oO6.png"
     };
 
     // Load Game
     buildings.push({ x: 0, y: 0, type: 'th', lvl: 1, isDone: true });
-    for(let i=0; i<40; i++) {
-        trees.push({ x: (Math.random()*1600-800), y: (Math.random()*1600-800), hp: 100 });
-    }
+    for(let i=0; i<30; i++) trees.push({ x: (Math.random()*1600-800), y: (Math.random()*1600-800) });
 
     function toIso(x, y) {
-        return { ix: (x - y) + cam.x, iy: (x + y) / 2 + cam.y };
+        return { ix: (x - y) + camera.x, iy: (x + y) / 2 + camera.y };
     }
 
     function toggleShop() {
         let s = document.getElementById('shop-menu');
         s.style.display = s.style.display === 'block' ? 'none' : 'block';
+        playSound("https://www.fesliyanstudios.com/play-mp3/387"); // UI Click Sound
     }
 
-    function prepareBuild(type, g, w) {
-        if(res.gold >= g) { placing = { type, g, w }; toggleShop(); }
-        else { showAlert("NEED MORE GOLD!"); }
+    function playSound(url) {
+        let a = new Audio(url); a.volume = 0.5; a.play();
     }
 
-    function showAlert(m) {
-        let a = document.getElementById('alert');
-        a.innerText = m; setTimeout(() => a.innerText = "", 3000);
+    function prepareBuild(type, cost) {
+        if(res.gold >= cost) {
+            placingMode = { type, cost };
+            toggleShop();
+        }
     }
 
-    function upgradeTH() {
-        let cost = res.thLvl * 2000;
-        if(res.gold >= cost && res.thLvl < 10) {
-            res.gold -= cost; res.thLvl++;
-            buildings.find(b => b.type === 'th').lvl = res.thLvl;
-            showAlert("TOWN HALL UPGRADED!");
-        } else { showAlert("NOT ENOUGH GOLD!"); }
-    }
-
-    // Input
+    // Input Handling
+    let isDragging = false, lastX, lastY;
     canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
     window.addEventListener('mousemove', e => {
-        if(isDragging) { cam.x += e.clientX - lastX; cam.y += e.clientY - lastY; lastX = e.clientX; lastY = e.clientY; }
+        if(isDragging) {
+            camera.x += e.clientX - lastX;
+            camera.y += e.clientY - lastY;
+            lastX = e.clientX; lastY = e.clientY;
+        }
     });
-    window.addEventListener('mouseup', e => {
-        if(!isDragging || Math.abs(e.clientX - lastX) < 5) {
-            let mx = e.clientX - cam.x, my = (e.clientY - cam.y) * 2;
-            let gx = Math.round(((my+mx)/2)/80)*80;
-            let gy = Math.round(((my-mx)/2)/80)*80;
 
-            if(placing) {
-                res.gold -= placing.g;
-                buildings.push({ x: gx, y: gy, type: placing.type, progress: 0, isDone: false });
-                player.tx = gx; player.ty = gy;
-                placing = null;
-            } else { player.tx = gx; player.ty = gy; }
+    window.addEventListener('mouseup', e => {
+        if(placingMode && !isDragging) {
+            let mx = e.clientX - camera.x, my = (e.clientY - camera.y) * 2;
+            let gx = Math.round(((my + mx) / 2) / 80) * 80;
+            let gy = Math.round(((my - mx) / 2) / 80) * 80;
+
+            res.gold -= placingMode.cost;
+            buildings.push({ x: gx, y: gy, type: placingMode.type, progress: 0, isDone: false });
+            placingMode = null;
+            playSound("https://www.fesliyanstudios.com/play-mp3/2655"); // Construction sound
         }
         isDragging = false;
     });
 
-    function drawSprite(type, x, y, size, alpha = 1) {
-        let p = toIso(x, y);
-        let img = new Image(); img.src = ASSETS[type];
-        ctx.globalAlpha = alpha;
+    function drawBuilding(b) {
+        let p = toIso(b.x, b.y);
+        let img = new Image(); img.src = ASSETS[b.type];
         
-        // Shadow
-        ctx.fillStyle = "rgba(0,0,0,0.2)";
-        ctx.beginPath(); ctx.ellipse(p.ix, p.iy, size/2, size/4, 0, 0, Math.PI*2); ctx.fill();
-        
+        // Shadow (3D Effect)
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
+        ctx.beginPath(); ctx.ellipse(p.ix, p.iy, 40, 20, 0, 0, Math.PI*2); ctx.fill();
+
+        let size = b.type === 'th' ? 120 : 90;
         ctx.drawImage(img, p.ix - size/2, p.iy - size * 0.8, size, size);
-        ctx.globalAlpha = 1;
+
+        if(!b.isDone) {
+            b.progress += 0.3;
+            // CoC Progress Bar
+            ctx.fillStyle = "#000"; ctx.fillRect(p.ix-30, p.iy-100, 60, 10);
+            ctx.fillStyle = "#2ecc71"; ctx.fillRect(p.ix-30, p.iy-100, b.progress * 0.6, 10);
+            if(b.progress >= 100) b.isDone = true;
+        }
     }
 
-    function loop() {
-        ctx.clearRect(0,0,canvas.width, canvas.height);
+    function gameLoop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Ground Grid (Pro Look)
-        ctx.strokeStyle = "rgba(0,0,0,0.05)";
+        // Grass Grid (Professional Tiles)
+        ctx.strokeStyle = "rgba(0,0,0,0.1)";
         for(let i=-1000; i<=1000; i+=80) {
             for(let j=-1000; j<=1000; j+=80) {
                 let p = toIso(i, j);
@@ -168,44 +173,22 @@
             }
         }
 
-        // Move Player
-        let dx = player.tx - player.x, dy = player.ty - player.y;
-        let d = Math.hypot(dx, dy);
-        if(d > 5) { player.x += (dx/d)*player.speed; player.y += (dy/d)*player.speed; }
-
-        // Trees
-        trees.forEach((t, i) => {
-            drawSprite('tree', t.x, t.y, 60);
-            if(Math.hypot(player.x - t.x, player.y - t.y) < 50) {
-                t.hp -= 0.5; if(Math.random()>0.95) { res.wood += 5; res.gold += 2; }
-                if(t.hp <= 0) trees.splice(i, 1);
-            }
+        trees.forEach(t => {
+            let p = toIso(t.x, t.y);
+            let img = new Image(); img.src = ASSETS.tree;
+            ctx.drawImage(img, p.ix-25, p.iy-40, 50, 50);
         });
 
-        // Buildings
-        buildings.forEach(b => {
-            drawSprite(b.type, b.x, b.y, b.type === 'th' ? 100 : 80);
-            if(!b.isDone) {
-                b.progress += 0.2; let p = toIso(b.x, b.y);
-                ctx.fillStyle = "#000"; ctx.fillRect(p.ix-25, p.iy-90, 50, 8);
-                ctx.fillStyle = "#2ecc71"; ctx.fillRect(p.ix-25, p.iy-90, b.progress/2, 8);
-                if(b.progress >= 100) b.isDone = true;
-            }
-        });
+        buildings.forEach(drawBuilding);
 
-        drawSprite('worker', player.x, player.y, 50);
-
-        // UI Updates
-        document.getElementById('ui-gold').innerText = Math.floor(res.gold);
-        document.getElementById('ui-wood').innerText = Math.floor(res.wood);
+        // Update UI
+        document.getElementById('ui-gold').innerText = res.gold.toLocaleString();
+        document.getElementById('ui-wood').innerText = res.wood.toLocaleString();
         document.getElementById('ui-th-lvl').innerText = res.thLvl;
-        document.getElementById('up-cost').innerText = (res.thLvl * 2000) + "G";
 
-        requestAnimationFrame(loop);
+        requestAnimationFrame(gameLoop);
     }
-
-    loop();
-    function saveGame() { localStorage.setItem('cocoClanSave', JSON.stringify({res, buildings})); showAlert("GAME SAVED!"); }
+    gameLoop();
 </script>
 </body>
 </html>
