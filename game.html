@@ -3,156 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Coco Clan: Kingdom Rise</title>
+    <title>Coco Clan - Battle Front</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Poppins', sans-serif; }
-        canvas { display: block; background: #2d5a27; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap');
+        body { margin: 0; background: #1a1a1a; overflow: hidden; font-family: 'Poppins', sans-serif; user-select: none; }
+        canvas { display: block; background: radial-gradient(circle, #4caf50 0%, #2e7d32 100%); }
 
-        /* UI Styling */
-        #ui { position: fixed; top: 0; left: 0; width: 100%; pointer-events: none; }
-        .stats-bar { display: flex; justify-content: space-around; background: rgba(0,0,0,0.8); padding: 10px; color: #f1c40f; font-size: 12px; pointer-events: all; border-bottom: 3px solid #f1c40f; }
+        /* UI Elements */
+        #login-screen { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; color: white; }
+        #login-screen input { padding: 15px; border-radius: 12px; border: 2px solid #f1c40f; width: 260px; margin: 20px; font-size: 18px; text-align: center; background: #222; color: #fff; }
+        #login-screen button { padding: 15px 40px; background: #f1c40f; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 18px; box-shadow: 0 5px 0 #b7950b; }
+
+        .top-ui { position: fixed; top: 15px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+        .res-box { background: rgba(0,0,0,0.8); border: 2px solid #f1c40f; border-radius: 12px; padding: 6px 15px; color: #fff; font-weight: bold; width: 140px; display: flex; justify-content: space-between; }
         
-        .build-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 20px; border: 2px solid #f1c40f; pointer-events: all; }
-        .slot { width: 60px; text-align: center; cursor: pointer; color: #fff; font-size: 8px; transition: 0.2s; }
-        .slot:hover { transform: scale(1.1); color: #f1c40f; }
-        .slot img { width: 40px; height: 40px; display: block; margin: 0 auto; }
+        .lvl-box { position: fixed; top: 15px; left: 15px; width: 60px; height: 60px; background: #2980b9; border: 3px solid #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 24px; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .commander-label { position: fixed; top: 25px; left: 85px; color: #fff; font-weight: bold; text-shadow: 2px 2px #000; background: rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 5px; }
 
-        #msg { position: fixed; top: 80px; width: 100%; text-align: center; color: #fff; text-shadow: 2px 2px #000; font-weight: bold; pointer-events: none; }
+        .bottom-ui { position: fixed; bottom: 25px; width: 100%; display: flex; justify-content: center; gap: 15px; z-index: 10; }
+        .btn { width: 85px; height: 85px; background: #e67e22; border: 3px solid #fff; border-radius: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold; box-shadow: 0 6px 0 #d35400; }
+        .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #d35400; }
+
+        #alert-box { position: fixed; top: 100px; width: 100%; text-align: center; color: #ff4757; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; pointer-events: none; opacity: 0; transition: 0.5s; }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <div class="stats-bar">
-        <span>🌲 Wood: <b id="wood">0</b></span>
-        <span>🪨 Stone: <b id="stone">0</b></span>
-        <span>💎 Gem: <b id="gem">0</b></span>
-        <span>⚔️ Troops: <b id="troops">0</b></span>
-    </div>
-    <div id="msg">🌲 Cut trees or mine stones to start building!</div>
+<div id="login-screen">
+    <h1 style="color: #f1c40f; font-size: 45px; margin-bottom: 0;">COCO CLAN</h1>
+    <p style="letter-spacing: 2px;">BATTLE FOR THE COCONUTS</p>
+    <input type="text" id="p-name" placeholder="Commander Name..." maxlength="10">
+    <button onclick="startGame()">START DEFENSE</button>
 </div>
 
-<div class="build-bar">
-    <div class="slot" onclick="setBuild('house', 5, 2, 0)">
-        <img src="https://cdn-icons-png.flaticon.com/512/619/619153.png">House(5W,2S)
-    </div>
-    <div class="slot" onclick="setBuild('barracks', 10, 5, 5)">
-        <img src="https://cdn-icons-png.flaticon.com/512/1063/1063181.png">Barracks
-    </div>
-    <div class="slot" onclick="setBuild('mine', 15, 10, 0)">
-        <img src="https://cdn-icons-png.flaticon.com/512/1239/1239608.png">Gem Mine
-    </div>
+<div id="alert-box">⚠️ ENEMY RAIDING! ⚠️</div>
+
+<div class="lvl-box" id="p-lvl">1</div>
+<div class="commander-label" id="p-display-name">COMMANDER</div>
+
+<div class="top-ui">
+    <div class="res-box"><span>🥥 COCO</span> <div id="ui-coco">500</div></div>
+    <div class="res-box"><span>🪵 WOOD</span> <div id="ui-wood">100</div></div>
 </div>
 
-<canvas id="game"></canvas>
+<div class="bottom-ui">
+    <div class="btn" onclick="buyItem('house', 200, 50)"><img src="https://cdn-icons-png.flaticon.com/512/619/619153.png" width="35">HOUSE</div>
+    <div class="btn" style="background:#2c3e50" onclick="buyItem('cannon', 500, 150)"><img src="https://cdn-icons-png.flaticon.com/512/1063/1063181.png" width="35">CANNON</div>
+    <div class="btn" style="background:#f1c40f; color:#000" onclick="saveGame()">SAVE</div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
 
 <script>
-    const canvas = document.getElementById('game');
+    const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 
-    let res = { wood: 10, stone: 10, gem: 0, troops: 0 };
-    let player = { x: canvas.width/2, y: canvas.height/2, size: 20, speed: 3 };
-    let trees = [], rocks = [], buildings = [];
-    let selectedBuild = null;
+    let res = { coco: 1000, wood: 200, name: "Commander", lvl: 1 };
+    let buildings = [], enemies = [], bullets = [];
+    let offsetX = canvas.width / 2, offsetY = canvas.height / 4;
+    let isDragging = false, lastX, lastY, currentPlacing = null;
 
-    // --- Sound System ---
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    function playSfx(freq, type) {
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        osc.type = type; osc.frequency.value = freq;
-        g.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.connect(g); g.connect(audioCtx.destination);
-        osc.start(); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        osc.stop(audioCtx.currentTime + 0.1);
-    }
-
-    // --- Init Objects ---
-    for(let i=0; i<15; i++) {
-        trees.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, hp: 3 });
-        rocks.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, hp: 5 });
-    }
-
-    function setBuild(type, w, s, g) {
-        selectedBuild = { type, w, s, g };
-        document.getElementById('msg').innerText = `Place your ${type} on the map!`;
-    }
-
-    canvas.addEventListener('click', (e) => {
-        if(audioCtx.state === 'suspended') audioCtx.resume();
-        
-        // 1. Build Logic
-        if(selectedBuild) {
-            if(res.wood >= selectedBuild.w && res.stone >= selectedBuild.s) {
-                res.wood -= selectedBuild.w; res.stone -= selectedBuild.s;
-                buildings.push({ x: e.clientX, y: e.clientY, type: selectedBuild.type, lvl: 1 });
-                playSfx(400, 'sine');
-                selectedBuild = null;
-                document.getElementById('msg').innerText = "Structure Built!";
-            } else {
-                document.getElementById('msg').innerText = "Need more resources!";
-            }
-            return;
+    function startGame() {
+        const nameInput = document.getElementById('p-name').value;
+        if(nameInput) {
+            res.name = nameInput;
+            document.getElementById('p-display-name').innerText = "CO: " + res.name;
+            document.getElementById('login-screen').style.display = "none";
+            loadGame();
+            spawnEnemyLoop();
         }
+    }
 
-        // 2. Interaction Logic (Chop/Mine)
-        trees.forEach((t, i) => {
-            if(Math.hypot(e.clientX-t.x, e.clientY-t.y) < 40) {
-                t.hp--; playSfx(150, 'square');
-                if(t.hp <= 0) { res.wood += 5; trees.splice(i, 1); }
-            }
-        });
-        rocks.forEach((r, i) => {
-            if(Math.hypot(e.clientX-r.x, e.clientY-r.y) < 40) {
-                r.hp--; playSfx(300, 'sawtooth');
-                if(r.hp <= 0) { res.stone += 3; rocks.splice(i, 1); }
-            }
-        });
+    function toIso(x, y) { return { ix: (x - y) + offsetX, iy: (x + y) / 2 + offsetY }; }
+
+    function buyItem(type, c, w) {
+        if(res.coco >= c && res.wood >= w) {
+            currentPlacing = { type, x: 0, y: 0, lvl: 1, hp: 100, maxHp: 100, c, w };
+        } else { alert("Not enough resources!"); }
+    }
+
+    canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+    canvas.addEventListener('mousemove', e => {
+        if (isDragging) { offsetX += e.clientX - lastX; offsetY += e.clientY - lastY; lastX = e.clientX; lastY = e.clientY; }
+        if (currentPlacing) {
+            let mx = e.clientX - offsetX, my = (e.clientY - offsetY) * 2;
+            currentPlacing.x = Math.round(((my+mx)/2)/40)*40;
+            currentPlacing.y = Math.round(((my-mx)/2)/40)*40;
+        }
     });
 
-    function draw() {
-        ctx.clearRect(0,0,canvas.width, canvas.height);
-        
-        // Draw Grass/Forest background
-        ctx.fillStyle = "#2d5a27"; ctx.fillRect(0,0,canvas.width, canvas.height);
+    window.addEventListener('mouseup', e => {
+        if (currentPlacing) {
+            res.coco -= currentPlacing.c; res.wood -= currentPlacing.w;
+            buildings.push({...currentPlacing}); currentPlacing = null;
+        }
+        isDragging = false;
+    });
 
-        // Draw Trees
-        trees.forEach(t => {
-            ctx.fillStyle = "#1b3310"; ctx.beginPath(); ctx.arc(t.x, t.y, 15, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = "#5d4037"; ctx.fillRect(t.x-5, t.y, 10, 20);
-        });
-
-        // Draw Rocks
-        rocks.forEach(r => {
-            ctx.fillStyle = "#757575"; ctx.beginPath(); ctx.arc(r.x, r.y, 12, 0, Math.PI*2); ctx.fill();
-        });
-
-        // Draw Buildings
-        buildings.forEach(b => {
-            ctx.fillStyle = b.type === 'house' ? '#a52a2a' : '#4682b4';
-            ctx.fillRect(b.x-25, b.y-25, 50, 50);
-            ctx.fillStyle = "#fff"; ctx.font = "8px Arial";
-            ctx.fillText(`${b.type.toUpperCase()} LVL:${b.lvl}`, b.x-20, b.y+5);
-        });
-
-        // Draw Player (Small Soldier)
-        ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(player.x, player.y, player.size, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(player.x-5, player.y-5, 2, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.arc(player.x+5, player.y-5, 2, 0, Math.PI*2); ctx.fill();
-
-        // Update Stats UI
-        document.getElementById('wood').innerText = res.wood;
-        document.getElementById('stone').innerText = res.stone;
-        document.getElementById('gem').innerText = res.gem;
-        document.getElementById('troops').innerText = res.troops;
-
-        requestAnimationFrame(draw);
+    function spawnEnemyLoop() {
+        setInterval(() => {
+            const side = Math.random() > 0.5 ? 400 : -400;
+            enemies.push({ x: side, y: (Math.random()*600-300), hp: 50, speed: 0.8 });
+            document.getElementById('alert-box').style.opacity = 1;
+            setTimeout(() => document.getElementById('alert-box').style.opacity = 0, 2000);
+        }, 15000);
     }
 
-    draw();
+    function drawWorld() {
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        
+        // Grid
+        for(let i=-400; i<=400; i+=80) {
+            for(let j=-400; j<=400; j+=80) {
+                let p = toIso(i, j); ctx.strokeStyle = "rgba(0,0,0,0.05)"; ctx.strokeRect(p.ix-40, p.iy, 80, 40);
+            }
+        }
+
+        // Buildings
+        buildings.forEach((b, idx) => {
+            let p = toIso(b.x, b.y);
+            ctx.fillStyle = b.type === 'house' ? '#a52a2a' : '#2c3e50';
+            ctx.beginPath();
+            ctx.moveTo(p.ix, p.iy-30); ctx.lineTo(p.ix+35, p.iy);
+            ctx.lineTo(p.ix, p.iy+35); ctx.lineTo(p.ix-35, p.iy);
+            ctx.fill();
+
+            // HP Bar
+            ctx.fillStyle = "#ff4757"; ctx.fillRect(p.ix-20, p.iy-40, 40, 4);
+            ctx.fillStyle = "#2ed573"; ctx.fillRect(p.ix-20, p.iy-40, (b.hp/b.maxHp)*40, 4);
+
+            // Cannon Logic
+            if(b.type === 'cannon') {
+                enemies.forEach(en => {
+                    let d = Math.hypot(b.x - en.x, b.y - en.y);
+                    if(d < 250 && Math.random() > 0.98) {
+                        bullets.push({ x: b.x, y: b.y, tx: en.x, ty: en.y, speed: 5 });
+                        en.hp -= 10;
+                    }
+                });
+            }
+            if(b.hp <= 0) buildings.splice(idx, 1);
+        });
+
+        // Enemies
+        enemies.forEach((en, i) => {
+            en.x += (0 - en.x) * 0.002; en.y += (0 - en.y) * 0.002;
+            let p = toIso(en.x, en.y);
+            ctx.fillStyle = "#ff4757"; ctx.beginPath(); ctx.arc(p.ix, p.iy, 8, 0, Math.PI*2); ctx.fill();
+            
+            // Attack buildings
+            buildings.forEach(b => {
+                if(Math.hypot(en.x-b.x, en.y-b.y) < 50) b.hp -= 0.1;
+            });
+
+            if(en.hp <= 0) { enemies.splice(i, 1); res.coco += 50; }
+        });
+
+        // Bullets
+        bullets.forEach((bl, i) => {
+            let dx = bl.tx - bl.x, dy = bl.ty - bl.y;
+            let dist = Math.hypot(dx, dy);
+            bl.x += dx/dist * bl.speed; bl.y += dy/dist * bl.speed;
+            let p = toIso(bl.x, bl.y);
+            ctx.fillStyle = "#f1c40f"; ctx.beginPath(); ctx.arc(p.ix, p.iy, 4, 0, Math.PI*2); ctx.fill();
+            if(dist < 5) bullets.splice(i, 1);
+        });
+
+        if(currentPlacing) {
+            let p = toIso(currentPlacing.x, currentPlacing.y);
+            ctx.globalAlpha = 0.5; ctx.fillStyle = "#fff"; ctx.fillRect(p.ix-20, p.iy-20, 40, 40); ctx.globalAlpha = 1;
+        }
+    }
+
+    function saveGame() {
+        localStorage.setItem('cocoClanBattleSave', JSON.stringify({ res, buildings }));
+        alert("Kingdom Progress Secured!");
+    }
+
+    function loadGame() {
+        const saved = localStorage.getItem('cocoClanBattleSave');
+        if(saved) {
+            const data = JSON.parse(saved);
+            res = data.res; buildings = data.buildings;
+            document.getElementById('p-display-name').innerText = "CO: " + res.name;
+        }
+    }
+
+    function loop() {
+        drawWorld();
+        document.getElementById('ui-coco').innerText = Math.floor(res.coco);
+        document.getElementById('ui-wood').innerText = Math.floor(res.wood);
+        document.getElementById('p-lvl').innerText = res.lvl;
+        requestAnimationFrame(loop);
+    }
+    loop();
 </script>
 </body>
 </html>
