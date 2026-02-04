@@ -1,115 +1,114 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>COCO VAULT | OFFICIAL WALLET</title>
+    <title>COCO VAULT | SOVEREIGN PROTOCOL</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root { --gold: #f1c40f; --bg: #000; --card: #0d0d0d; --border: #1a1a1a; --green: #00ff88; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
         body { background: var(--bg); color: white; font-family: 'Inter', sans-serif; margin: 0; overflow: hidden; height: 100vh; }
 
-        /* Page Handling */
+        /* Smooth Page Transitions */
         .page { display: none; height: 100vh; width: 100vw; padding: 25px; position: absolute; top: 0; left: 0; overflow-y: auto; }
-        .active { display: block; animation: fadeIn 0.4s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .active { display: block; animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-        /* Login & UI Components */
-        .logo-area { text-align: center; margin: 50px 0; }
-        .logo-area h1 { font-family: 'Orbitron'; color: var(--gold); letter-spacing: 5px; }
-        
-        input { width: 100%; padding: 18px; background: #0a0a0a; border: 1px solid #222; color: #fff; border-radius: 12px; margin-bottom: 15px; font-size: 16px; }
-        .btn { width: 100%; padding: 18px; border-radius: 12px; font-weight: 900; font-family: 'Orbitron'; border: none; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        .btn-gold { background: var(--gold); color: #000; }
+        /* Typography & Inputs */
+        h1, h2, h3 { font-family: 'Orbitron'; color: var(--gold); letter-spacing: 3px; text-align: center; }
+        input { width: 100%; padding: 18px; background: #070707; border: 1px solid #1a1a1a; color: #fff; border-radius: 15px; margin-bottom: 15px; font-size: 16px; transition: 0.3s; }
+        input:focus { border-color: var(--gold); box-shadow: 0 0 10px rgba(241, 196, 15, 0.1); }
+
+        .btn { width: 100%; padding: 18px; border-radius: 15px; font-weight: 900; font-family: 'Orbitron'; border: none; cursor: pointer; transition: 0.3s; margin-top: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-gold { background: var(--gold); color: #000; box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
+        .btn-gold:active { transform: scale(0.97); }
         .btn-outline { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
 
-        /* Wallet Dashboard */
-        .asset-card { background: linear-gradient(145deg, #111, #000); border: 1px solid var(--border); border-radius: 30px; padding: 35px 20px; text-align: center; border-bottom: 4px solid var(--gold); margin-bottom: 25px; }
-        .balance { font-family: 'Orbitron'; font-size: 38px; color: #fff; margin: 10px 0; }
-        .id-label { font-size: 10px; color: var(--gold); background: rgba(241,196,15,0.1); padding: 5px 12px; border-radius: 20px; }
+        /* Dashboard UI */
+        .asset-card { background: linear-gradient(145deg, #0f0f0f, #000); border: 1px solid var(--border); border-radius: 35px; padding: 35px 20px; text-align: center; border-bottom: 4px solid var(--gold); margin-bottom: 25px; box-shadow: 0 15px 30px rgba(0,0,0,0.5); }
+        .balance-value { font-family: 'Orbitron'; font-size: 40px; color: #fff; margin: 10px 0; font-weight: 900; }
+        .badge { font-size: 10px; color: var(--gold); background: rgba(241,196,15,0.05); padding: 6px 15px; border-radius: 50px; border: 1px solid rgba(241,196,15,0.2); }
 
-        /* Limits & Info */
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .info-box { background: var(--card); padding: 15px; border-radius: 15px; border: 1px solid var(--border); font-size: 11px; }
-        .info-box span { display: block; color: #555; margin-bottom: 5px; }
+        /* Conversion Section */
+        .convert-card { background: #080808; border: 1px dashed #222; border-radius: 20px; padding: 20px; margin-bottom: 20px; }
+        .convert-row { display: flex; justify-content: space-between; align-items: center; }
+        .pts-display { color: var(--green); font-family: 'Orbitron'; font-size: 18px; }
 
-        /* Mining Redirect Button */
-        .mining-redirect { background: linear-gradient(90deg, #111, #1a1a1a); border: 1px solid var(--gold); padding: 20px; border-radius: 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; margin-top: 20px; }
-        .mining-redirect b { color: var(--gold); font-family: 'Orbitron'; font-size: 13px; }
+        /* Navigation Bar (Bottom) */
+        .nav-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #050505; border-top: 1px solid #111; display: flex; justify-content: space-around; padding: 15px 0; }
+        .nav-item { font-size: 10px; color: #444; text-align: center; text-transform: uppercase; font-weight: bold; }
+        .nav-item.active-nav { color: var(--gold); }
 
-        /* Policy & Settings */
-        .footer-links { text-align: center; margin-top: 30px; font-size: 12px; color: #444; }
-        .footer-links a { color: #888; text-decoration: none; margin: 0 10px; }
+        /* Security PIN Overlay */
+        #pin-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:2000; padding:50px 25px; text-align:center; }
     </style>
 </head>
 <body>
 
-    <div id="login-page" class="page active">
-        <div class="logo-area">
+    <div id="pin-overlay">
+        <h3>CONFIRM PIN</h3>
+        <p style="color:#444; font-size:12px;">Enter your 6-digit Transaction Key</p>
+        <input type="password" id="tx-pin" maxlength="6" style="text-align:center; font-size:30px; letter-spacing:10px;">
+        <button class="btn btn-gold" onclick="verifyAndConvert()">VERIFY & CONVERT</button>
+        <button class="btn btn-outline" onclick="closePin()">CANCEL</button>
+    </div>
+
+    <div id="auth-page" class="page active">
+        <div style="margin-top:80px; text-align:center;">
+            <div style="font-size:50px; margin-bottom:20px;">🛡️</div>
             <h1>COCO VAULT</h1>
-            <p style="color:#555; font-size:12px;">SECURE ASSET ACCESS</p>
+            <p style="color:#444; font-size:12px; letter-spacing:2px;">SECURED BY MYSTERY SYSTEM</p>
         </div>
-        <input type="text" id="login-email" placeholder="Sovereign ID or Email">
-        <input type="password" id="login-pass" placeholder="Access Key">
-        <button class="btn btn-gold" onclick="login()">ENTER VAULT</button>
-        <button class="btn btn-outline" style="margin-top:20px;" onclick="showPage('register-page')">CREATE ACCOUNT</button>
-        <div class="footer-links">
-            <a href="#" onclick="showPage('policy-page')">Privacy Policy</a>
+        <div style="margin-top:50px;">
+            <input type="text" id="login-id" placeholder="Sovereign ID (COCO-XXXX)">
+            <input type="password" id="login-pass" placeholder="Access Key">
+            <button class="btn btn-gold" onclick="login()">Enter Sovereign Vault</button>
+            <button class="btn btn-outline" onclick="showPage('reg-page')">Create New Identity</button>
         </div>
     </div>
 
-    <div id="register-page" class="page">
-        <div class="logo-area"><h2>NEW IDENTITY</h2></div>
-        <input type="text" id="reg-name" placeholder="Full Name">
+    <div id="reg-page" class="page">
+        <h2>NEW IDENTITY</h2>
+        <p style="text-align:center; color:#555; font-size:12px; margin-bottom:30px;">Initialize your decentralized asset account</p>
+        <input type="text" id="reg-name" placeholder="Legal Full Name">
         <input type="email" id="reg-email" placeholder="Email Address">
         <input type="password" id="reg-pass" placeholder="Set Access Key">
-        <button class="btn btn-gold" onclick="register()">CREATE SOVEREIGN ID</button>
-        <button class="btn btn-outline" onclick="showPage('login-page')">BACK TO LOGIN</button>
+        <input type="password" id="reg-pin" placeholder="Set 6-Digit Transaction PIN" maxlength="6">
+        <button class="btn btn-gold" onclick="register()">Generate Sovereign ID</button>
+        <button class="btn btn-outline" onclick="showPage('auth-page')">Return to Login</button>
     </div>
 
     <div id="dash-page" class="page">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <span class="id-label" id="display-id">ID: COCO-XXXX</span>
-            <span style="font-size:18px; cursor:pointer;" onclick="logout()">Logout 🚪</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+            <span class="badge" id="user-id-display">ID: COCO-XXXX</span>
+            <span style="font-size:20px;" onclick="logout()">🚪</span>
         </div>
-        
+
         <div class="asset-card">
-            <small style="color:#666; letter-spacing:2px;">TOTAL BALANCE</small>
-            <div class="balance" id="balance">0.00</div>
-            <small style="color:var(--green)">● Mystery Security Active</small>
+            <div style="font-size:11px; color:#555; letter-spacing:3px;">TOTAL ASSET BALANCE</div>
+            <div class="balance-value" id="balance-val">0.00</div>
+            <div class="badge" style="color:var(--green); border-color:var(--green);">● SYSTEM ENCRYPTED</div>
         </div>
 
-        <div class="info-grid">
-            <div class="info-box"><span>MIN WITHDRAWAL</span><b>10,000 COCO</b></div>
-            <div class="info-box"><span>MAX DAILY</span><b>500,000 COCO</b></div>
-        </div>
-
-        <div class="mining-redirect" onclick="window.location.href='https://t.me/YOUR_BOT_LINK'">
-            <div>
-                <b>MINING HUB</b><br>
-                <small style="color:#666">Go to Tapping App to harvest</small>
+        <div class="convert-card">
+            <div class="convert-row">
+                <div>
+                    <small style="color:#555; display:block; margin-bottom:5px;">TELEGRAM MINING POINTS</small>
+                    <b class="pts-display" id="tg-pts-val">0 PTS</b>
+                </div>
+                <button class="btn-gold" style="padding:10px 20px; font-size:11px; border-radius:10px; font-weight:900; border:none;" onclick="openPin()">CONVERT</button>
             </div>
-            <span style="font-size:24px;">🚀</span>
+            <p style="font-size:9px; color:#333; margin-top:10px; text-align:center;">Conversion Rate: 1000 PTS = 1 COCO COIN</p>
         </div>
 
-        <div class="history-section" style="margin-top:30px;">
-            <h4 style="font-family:'Orbitron'; font-size:12px; color:#444;">SECURITY LOGS</h4>
-            <div style="background:#0a0a0a; padding:15px; border-radius:12px; font-size:11px; color:#555; margin-top:10px;">
-                Wallet Encrypted with Private Key. Device verification successful.
-            </div>
+        <div class="btn btn-outline" style="text-align:center; padding:20px;" onclick="window.location.href='https://t.me/YOUR_BOT_LINK'">
+            <span style="font-size:12px;">🚀 GO TO TAPPING HUB</span>
         </div>
-        <center style="margin-top:40px;"><a href="#" onclick="showPage('policy-page')" style="color:#333; font-size:10px;">Privacy & Terms</a></center>
-    </div>
 
-    <div id="policy-page" class="page">
-        <h2 style="font-family:'Orbitron'; color:var(--gold);">PRIVACY POLICY</h2>
-        <div style="color:#888; font-size:14px; line-height:1.8;">
-            <p>1. <b>Data Sovereignty:</b> All private keys are stored locally on your device and encrypted.</p>
-            <p>2. <b>Security:</b> We use the Mystery Security System to protect cross-app data transfers.</p>
-            <p>3. <b>Anonymity:</b> No personal identity documents are required for basic asset management.</p>
+        <div style="margin-top:30px; padding:20px; background:#050505; border-radius:20px; font-size:11px; color:#333;">
+            <b>SECURITY STATUS:</b> Unreachable. The Mystery Security System is currently monitoring all active nodes for your identity.
         </div>
-        <button class="btn btn-gold" onclick="showPage('login-page')">I UNDERSTAND</button>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
@@ -129,84 +128,81 @@
             document.getElementById(id).classList.add('active');
         }
 
+        // --- AUTH LOGIC ---
         function register() {
             const name = document.getElementById('reg-name').value;
             const email = document.getElementById('reg-email').value;
             const pass = document.getElementById('reg-pass').value;
-            if(!name || !email || !pass) return alert("Fill all fields");
+            const pin = document.getElementById('reg-pin').value;
+
+            if(!name || !email || !pass || pin.length < 6) return alert("Please fill all fields. PIN must be 6 digits.");
 
             const newId = 'COCO-' + Math.floor(1000 + Math.random() * 9000);
             db.ref('users/' + newId).set({
-                name, email, password: pass, balance: 0, 
+                name, email, password: pass, pin: pin, balance: 0, points: 5000, // 5000 Welcome Points
                 created_at: Date.now()
             }).then(() => {
-                alert("Account Created! Your ID is: " + newId);
-                showPage('login-page');
+                alert("IDENTITY CREATED!\nYour Sovereign ID: " + newId);
+                showPage('auth-page');
             });
         }
 
         function login() {
-            const idInput = document.getElementById('login-email').value;
-            const passInput = document.getElementById('login-pass').value;
+            const idInput = document.getElementById('login-id').value.trim();
+            const passInput = document.getElementById('login-pass').value.trim();
 
-            db.ref('users/' + idInput).once('value', (snap) => {
+            db.ref('users/' + idInput).once('value').then((snap) => {
                 const user = snap.val();
                 if(user && user.password === passInput) {
-                    localStorage.setItem('logged_coco_id', idInput);
+                    localStorage.setItem('coco_user', idInput);
                     startDashboard(idInput);
                 } else {
-                    alert("Invalid Credentials");
+                    alert("Invalid Credentials. Please check your ID and Access Key.");
                 }
             });
         }
 
+        // --- DASHBOARD LOGIC ---
         function startDashboard(id) {
-            document.getElementById('display-id').innerText = "ID: " + id;
+            document.getElementById('user-id-display').innerText = "ID: " + id;
             db.ref('users/' + id).on('value', (snap) => {
                 const data = snap.val();
-                document.getElementById('balance').innerText = (data.balance || 0).toLocaleString();
+                document.getElementById('balance-val').innerText = (data.balance || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('tg-pts-val').innerText = (data.points || 0).toLocaleString() + " PTS";
             });
             showPage('dash-page');
         }
 
-        function logout() {
-            localStorage.removeItem('logged_coco_id');
-            showPage('login-page');
-        }
+        // --- CONVERT LOGIC WITH PIN ---
+        function openPin() { document.getElementById('pin-overlay').style.display = 'block'; }
+        function closePin() { document.getElementById('pin-overlay').style.display = 'none'; document.getElementById('tx-pin').value = ''; }
 
-        // Auto Login
-        window.onload = () => {
-            const savedId = localStorage.getItem('logged_coco_id');
-            if(savedId) startDashboard(savedId);
-        };
-             function login() {
-            const idInput = document.getElementById('login-email').value.trim();
-            const passInput = document.getElementById('login-pass').value.trim();
+        function verifyAndConvert() {
+            const id = localStorage.getItem('coco_user');
+            const pinInput = document.getElementById('tx-pin').value;
 
-            if(!idInput || !passInput) return alert("Please enter ID and Password");
-
-            console.log("Attempting login for:", idInput);
-
-            db.ref('users/' + idInput).once('value')
-            .then((snap) => {
+            db.ref('users/' + id).once('value').then((snap) => {
                 const user = snap.val();
-                if(user) {
-                    if(user.password === passInput) {
-                        localStorage.setItem('logged_coco_id', idInput);
-                        startDashboard(idInput);
-                    } else {
-                        alert("Wrong Password! Please check again.");
-                    }
+                if(user.pin === pinInput) {
+                    const pts = user.points || 0;
+                    if(pts < 1000) { alert("Insufficient points (Min 1000 PTS)"); return; }
+
+                    const coins = pts / 1000;
+                    db.ref('users/' + id).update({
+                        points: 0,
+                        balance: (user.balance || 0) + coins
+                    }).then(() => {
+                        alert("Sovereign Confirmation: " + coins + " COCO added to Vault.");
+                        closePin();
+                    });
                 } else {
-                    alert("ID not found! Please Register first.");
+                    alert("SECURITY ALERT: Invalid Transaction PIN.");
                 }
-            })
-            .catch((error) => {
-                console.error("Firebase Error:", error);
-                alert("Connection Error: Check your Firebase Rules or Internet.");
             });
         }
 
+        function logout() { localStorage.clear(); location.reload(); }
+        window.onload = () => { if(localStorage.getItem('coco_user')) startDashboard(localStorage.getItem('coco_user')); };
     </script>
 </body>
 </html>
