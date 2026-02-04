@@ -179,6 +179,34 @@
             const savedId = localStorage.getItem('logged_coco_id');
             if(savedId) startDashboard(savedId);
         };
+             function login() {
+            const idInput = document.getElementById('login-email').value.trim();
+            const passInput = document.getElementById('login-pass').value.trim();
+
+            if(!idInput || !passInput) return alert("Please enter ID and Password");
+
+            console.log("Attempting login for:", idInput);
+
+            db.ref('users/' + idInput).once('value')
+            .then((snap) => {
+                const user = snap.val();
+                if(user) {
+                    if(user.password === passInput) {
+                        localStorage.setItem('logged_coco_id', idInput);
+                        startDashboard(idInput);
+                    } else {
+                        alert("Wrong Password! Please check again.");
+                    }
+                } else {
+                    alert("ID not found! Please Register first.");
+                }
+            })
+            .catch((error) => {
+                console.error("Firebase Error:", error);
+                alert("Connection Error: Check your Firebase Rules or Internet.");
+            });
+        }
+
     </script>
 </body>
 </html>
