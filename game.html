@@ -9,19 +9,24 @@
         :root { --gold: #f1c40f; --bg: #000; --card: #0d0d0d; --border: #1a1a1a; --green: #00ff88; --red: #ff4d4d; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
         body { background: var(--bg); color: white; font-family: 'Inter', sans-serif; margin: 0; overflow-x: hidden; }
+
         .page { display: none; min-height: 100vh; width: 100vw; padding: 25px; }
         .active { display: block; animation: fadeIn 0.4s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
         h1, h2 { font-family: 'Orbitron'; color: var(--gold); text-align: center; letter-spacing: 3px; }
         input { width: 100%; padding: 16px; background: #070707; border: 1px solid #1a1a1a; color: #fff; border-radius: 12px; margin-bottom: 12px; }
-        .btn { width: 100%; padding: 18px; border-radius: 15px; font-weight: 900; font-family: 'Orbitron'; border: none; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        
+        .btn { width: 100%; padding: 18px; border-radius: 15px; font-weight: 900; font-family: 'Orbitron'; border: none; cursor: pointer; margin-top: 10px; }
         .btn-gold { background: var(--gold); color: #000; }
-        .btn-gold:active { transform: scale(0.95); }
         .btn-outline { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
+
         .asset-card { background: linear-gradient(145deg, #111, #000); border: 1px solid var(--border); border-radius: 30px; padding: 30px 15px; text-align: center; border-bottom: 4px solid var(--gold); margin-bottom: 20px; }
         .p2p-card { background: #080808; border: 1px solid #111; border-radius: 20px; padding: 20px; margin-bottom: 15px; }
         .badge { font-size: 10px; color: var(--gold); background: rgba(241,196,15,0.05); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(241,196,15,0.2); }
+        
         .policy-text { font-size: 13px; color: #777; line-height: 1.6; background: #050505; padding: 20px; border-radius: 15px; border: 1px solid #111; }
+        
         #pin-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:2000; padding:40px; text-align:center; }
     </style>
 </head>
@@ -43,7 +48,7 @@
         <div style="margin-top:40px;">
             <input type="text" id="login-id" placeholder="Sovereign ID (e.g. COCO-1234)">
             <input type="password" id="login-pass" placeholder="Access Key">
-            <button class="btn btn-gold" id="_0x_lgn">ENTER Wallet</button>
+            <button class="btn btn-gold" onclick="login()">ENTER Wallet</button>
             <button class="btn btn-outline" onclick="showPage('reg-page')">CREATE IDENTITY</button>
             <center style="margin-top:20px;"><a href="#" onclick="showPage('policy-page')" style="color:#333; font-size:12px; text-decoration:none;">Privacy Policy</a></center>
         </div>
@@ -55,32 +60,36 @@
         <input type="email" id="reg-email" placeholder="Email Address">
         <input type="password" id="reg-pass" placeholder="Set Access Key">
         <input type="password" id="reg-pin" placeholder="Set 6-Digit Transaction PIN" maxlength="6">
-        <button class="btn btn-gold" id="_0x_reg">REGISTER ID</button>
+        <button class="btn btn-gold" onclick="register()">REGISTER ID</button>
         <button class="btn btn-outline" onclick="showPage('auth-page')">BACK</button>
     </div>
 
     <div id="dash-page" class="page">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <span class="badge" id="u-id">ID: COCO-XXXX</span>
-            <span id="_0x_lgo" style="cursor:pointer;">Logout 🚪</span>
+            <span onclick="logout()" style="cursor:pointer;">Logout 🚪</span>
         </div>
+
         <div class="asset-card">
             <small style="color:#555; letter-spacing:2px;">Wallet BALANCE</small>
             <div style="font-family:'Orbitron'; font-size:38px; margin:10px 0;" id="u-balance">0.00</div>
             <span class="badge" style="color:var(--green); border-color:var(--green);">SECURED</span>
         </div>
+
         <div class="p2p-card">
             <b style="color:var(--gold); font-family:'Orbitron'; font-size:12px;">P2P TRANSFER</b>
             <input type="text" id="p2p-target" placeholder="Recipient COCO-ID" style="margin-top:10px; font-size:13px;">
             <input type="number" id="p2p-amount" placeholder="Amount to Send" style="font-size:13px;">
             <button class="btn-gold" style="padding:12px; font-size:11px; border-radius:10px; width:100%; border:none; font-weight:bold;" onclick="openPin('p2p')">SEND COCO</button>
         </div>
+
         <div class="p2p-card" style="border-style: dashed;">
             <div style="display:flex; justify-content:space-between;">
                 <div><small style="color:#555;">MINING POINTS</small><br><b id="u-points" style="color:var(--green);">0 PTS</b></div>
                 <button class="btn-gold" style="padding:8px 15px; font-size:10px; border-radius:8px; border:none;" onclick="openPin('swap')">CONVERT</button>
             </div>
         </div>
+
         <button class="btn btn-outline" onclick="window.location.href='https://t.me/Cococoin_mining_bot'">🚀 TAPPING HUB</button>
     </div>
 
@@ -88,8 +97,8 @@
         <h2>POLICIES</h2>
         <div class="policy-text">
             <b>1. P2P Transactions:</b> All transfers are final. Mystery Security System encrypts movements. <br><br>
-            <b>2. Account Limits:</b> Min withdrawal 10,000 COCO. <br><br>
-            <b>3. Data Usage:</b> PINs are one-way encrypted.
+            <b>2. Account Limits:</b> Minimum withdrawal 10,000 COCO. <br><br>
+            <b>3. Data Usage:</b> PINs are stored securely.
         </div>
         <button class="btn btn-gold" onclick="showPage('auth-page')">I ACCEPT</button>
     </div>
@@ -98,90 +107,122 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
     <script>
-        (function(){
-            const _0xconfig = {
-                apiKey: "AIzaSyDE9SYe-4rS5jMeXStqg9pc_IuBsiySdaU",
-                databaseURL: "https://cococoin-mine-c7b27-default-rtdb.asia-southeast1.firebasedatabase.app/",
-                projectId: "cococoin-mine-c7b27"
-            };
-            firebase.initializeApp(_0xconfig);
-            const _0xdb = firebase.database();
-            let _0xcurAct = '';
+        // --- Firebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDE9SYe-4rS5jMeXStqg9pc_IuBsiySdaU",
+            databaseURL: "https://cococoin-mine-c7b27-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "cococoin-mine-c7b27"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-            window.showPage = function(i){
-                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                document.getElementById(i).classList.add('active');
-            };
+        let currentAction = '';
 
-            document.getElementById('_0x_reg').onclick = function(){
-                const n = document.getElementById('reg-name').value, e = document.getElementById('reg-email').value, p = document.getElementById('reg-pass').value, i = document.getElementById('reg-pin').value;
-                if(!n || !p || i.length < 6) return alert("Verify all fields.");
-                const nid = 'COCO-' + Math.floor(1000 + Math.random() * 8999);
-                _0xdb.ref('users/' + nid).set({ name: n, email: e, password: p, pin: i, balance: 10, points: 5000 }).then(() => {
-                    alert("ID Created: " + nid); showPage('auth-page');
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // --- Register Function ---
+        function register() {
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+            const pin = document.getElementById('reg-pin').value;
+            if(!name || !pass || pin.length < 6) return alert("Verify all fields.");
+
+            const nid = 'COCO-' + Math.floor(1000 + Math.random() * 8999);
+            db.ref('users/' + nid).set({
+                name, email, password: pass, pin, balance: 0, points: 100
+            }).then(() => {
+                alert("ID Created: " + nid);
+                showPage('auth-page');
+            });
+        }
+
+        // --- Login Function ---
+        function login() {
+            const id = document.getElementById('login-id').value.trim();
+            const pw = document.getElementById('login-pass').value.trim();
+            db.ref('users/' + id).once('value').then(s => {
+                const u = s.val();
+                if(u && u.password === pw) {
+                    localStorage.setItem('c_user_token', id);
+                    startDash(id);
+                } else alert("Invalid ID or Access Key.");
+            });
+        }
+
+        function startDash(id) {
+            document.getElementById('u-id').innerText = "ID: " + id;
+            db.ref('users/' + id).on('value', s => {
+                const d = s.val() || {};
+                document.getElementById('u-balance').innerText = (parseFloat(d.balance) || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('u-points').innerText = (parseFloat(d.points) || 0).toLocaleString() + " PTS";
+            });
+            showPage('dash-page');
+        }
+
+        // --- PIN Overlay Logic ---
+        function openPin(action) { 
+            currentAction = action; 
+            document.getElementById('pin-overlay').style.display = 'block';
+            document.getElementById('confirm-action-btn').onclick = currentAction === 'p2p' ? handleP2P : handleSwap;
+        }
+        function closePin() { document.getElementById('pin-overlay').style.display = 'none'; document.getElementById('action-pin').value = ''; }
+
+        // --- FIXED SWAP LOGIC ---
+        function handleSwap() {
+            const id = localStorage.getItem('c_user_token');
+            const pin = document.getElementById('action-pin').value;
+            db.ref('users/' + id).once('value').then(s => {
+                const u = s.val();
+                if(u.pin !== pin) return alert("Wrong PIN");
+                if(u.points < 1000) return alert("Minimum 1000 PTS needed to convert.");
+                
+                const coinsEarned = parseFloat(u.points) / 1000;
+                
+                db.ref('users/' + id).runTransaction((currentData) => {
+                    if (currentData) {
+                        currentData.balance = (parseFloat(currentData.balance) || 0) + coinsEarned;
+                        currentData.points = 0;
+                    }
+                    return currentData;
+                }).then(() => {
+                    alert("Converted Successfully!");
+                    closePin();
                 });
-            };
+            });
+        }
 
-            document.getElementById('_0x_lgn').onclick = function(){
-                const id = document.getElementById('login-id').value.trim(), pw = document.getElementById('login-pass').value.trim();
-                _0xdb.ref('users/' + id).once('value').then(s => {
-                    const u = s.val();
-                    if(u && u.password === pw){ localStorage.setItem('_0x_token', id); _0xinit(id); }
-                    else alert("Access Denied.");
+        // --- FIXED P2P TRANSFER ---
+        function handleP2P() {
+            const myId = localStorage.getItem('c_user_token');
+            const toId = document.getElementById('p2p-target').value.trim();
+            const amt = parseFloat(document.getElementById('p2p-amount').value);
+            const pin = document.getElementById('action-pin').value;
+
+            if(!toId || isNaN(amt) || amt <= 0) return alert("Invalid entry.");
+
+            db.ref('users/' + myId).once('value').then(ms => {
+                const me = ms.val();
+                if(me.pin !== pin) return alert("Wrong PIN");
+                if(parseFloat(me.balance) < amt) return alert("Insufficient Balance.");
+
+                db.ref('users/' + toId).once('value').then(ts => {
+                    if(!ts.exists()) return alert("Recipient ID not found!");
+
+                    db.ref('users/' + myId + '/balance').transaction(b => (parseFloat(b) || 0) - amt);
+                    db.ref('users/' + toId + '/balance').transaction(b => (parseFloat(b) || 0) + amt);
+                    
+                    alert("Transfer Successful to " + toId);
+                    closePin();
                 });
-            };
+            });
+        }
 
-            function _0xinit(id){
-                document.getElementById('u-id').innerText = "ID: " + id;
-                _0xdb.ref('users/' + id).on('value', s => {
-                    const d = s.val();
-                    document.getElementById('u-balance').innerText = (d.balance || 0).toLocaleString();
-                    document.getElementById('u-points').innerText = (d.points || 0).toLocaleString() + " PTS";
-                });
-                showPage('dash-page');
-            }
-
-            window.openPin = function(a){
-                _0xcurAct = a;
-                document.getElementById('pin-overlay').style.display = 'block';
-                document.getElementById('confirm-action-btn').onclick = (_0xcurAct === 'p2p') ? _0xhndlP : _0xhndlS;
-            };
-
-            window.closePin = function(){ document.getElementById('pin-overlay').style.display='none'; document.getElementById('action-pin').value=''; };
-
-            function _0xhndlS(){
-                const id = localStorage.getItem('_0x_token'), pin = document.getElementById('action-pin').value;
-                _0xdb.ref('users/' + id).once('value').then(s => {
-                    const u = s.val();
-                    if(u.pin !== pin) return alert("Wrong PIN");
-                    if(u.points < 1000) return alert("Min 1000 PTS");
-                    const c = u.points / 1000;
-                    _0xdb.ref('users/' + id).update({ points: 0, balance: u.balance + c });
-                    alert("Converted Successfully!"); closePin();
-                });
-            }
-
-            function _0xhndlP(){
-                const myId = localStorage.getItem('_0x_token'), toId = document.getElementById('p2p-target').value.trim(), amt = parseFloat(document.getElementById('p2p-amount').value), pin = document.getElementById('action-pin').value;
-                if(!toId || isNaN(amt) || amt <= 0) return alert("Invalid Data");
-                _0xdb.ref('users/' + myId).once('value').then(ms => {
-                    const me = ms.val();
-                    if(me.pin !== pin) return alert("Wrong PIN");
-                    if(me.balance < amt) return alert("Low Balance");
-                    _0xdb.ref('users/' + toId).once('value').then(ts => {
-                        const to = ts.val();
-                        if(!to) return alert("ID not found");
-                        _0xdb.ref('users/' + myId).update({ balance: me.balance - amt });
-                        _0xdb.ref('users/' + toId).update({ balance: (to.balance || 0) + amt });
-                        alert("Transfer Success!"); closePin();
-                    });
-                });
-            }
-
-            document.getElementById('_0x_lgo').onclick = function(){ localStorage.clear(); location.reload(); };
-            window.onload = () => { if(localStorage.getItem('_0x_token')) _0xinit(localStorage.getItem('_0x_token')); };
-        })();
+        function logout() { localStorage.clear(); location.reload(); }
+        window.onload = () => { if(localStorage.getItem('c_user_token')) startDash(localStorage.getItem('c_user_token')); };
     </script>
 </body>
 </html>
-
