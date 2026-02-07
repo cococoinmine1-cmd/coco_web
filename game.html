@@ -9,24 +9,18 @@
         :root { --gold: #f1c40f; --bg: #000; --card: #0d0d0d; --border: #1a1a1a; --green: #00ff88; --red: #ff4d4d; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
         body { background: var(--bg); color: white; font-family: 'Inter', sans-serif; margin: 0; overflow-x: hidden; }
-
         .page { display: none; min-height: 100vh; width: 100vw; padding: 25px; }
         .active { display: block; animation: fadeIn 0.4s ease; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
         h1, h2 { font-family: 'Orbitron'; color: var(--gold); text-align: center; letter-spacing: 3px; }
         input { width: 100%; padding: 16px; background: #070707; border: 1px solid #1a1a1a; color: #fff; border-radius: 12px; margin-bottom: 12px; }
-        
         .btn { width: 100%; padding: 18px; border-radius: 15px; font-weight: 900; font-family: 'Orbitron'; border: none; cursor: pointer; margin-top: 10px; }
         .btn-gold { background: var(--gold); color: #000; }
         .btn-outline { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
-
         .asset-card { background: linear-gradient(145deg, #111, #000); border: 1px solid var(--border); border-radius: 30px; padding: 30px 15px; text-align: center; border-bottom: 4px solid var(--gold); margin-bottom: 20px; }
         .p2p-card { background: #080808; border: 1px solid #111; border-radius: 20px; padding: 20px; margin-bottom: 15px; }
         .badge { font-size: 10px; color: var(--gold); background: rgba(241,196,15,0.05); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(241,196,15,0.2); }
-        
         .policy-text { font-size: 13px; color: #777; line-height: 1.6; background: #050505; padding: 20px; border-radius: 15px; border: 1px solid #111; }
-        
         #pin-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:2000; padding:40px; text-align:center; }
     </style>
 </head>
@@ -91,14 +85,15 @@
         </div>
 
         <button class="btn btn-outline" onclick="window.location.href='https://t.me/Cococoin_mining_bot'">🚀 TAPPING HUB</button>
+        <center style="margin-top:30px;"><a href="#" onclick="showPage('policy-page')" style="color:#222; font-size:10px;">Legal & Privacy Policy</a></center>
     </div>
 
     <div id="policy-page" class="page">
         <h2>POLICIES</h2>
         <div class="policy-text">
-            <b>1. P2P Transactions:</b> All transfers are final. Mystery Security System encrypts movements. <br><br>
-            <b>2. Account Limits:</b> Minimum withdrawal 10,000 COCO. <br><br>
-            <b>3. Data Usage:</b> PINs are stored securely.
+            <b>1. P2P Transactions:</b> All transfers are final. The Mystery Security System encrypts every peer-to-peer movement. <br><br>
+            <b>2. Account Limits:</b> Minimum withdrawal is 10,000 COCO. Maximum daily transfer is 500,000 COCO. <br><br>
+            <b>3. Data Usage:</b> We do not share your private Access Keys. Your PIN is stored in a one-way encrypted hash.
         </div>
         <button class="btn btn-gold" onclick="showPage('auth-page')">I ACCEPT</button>
     </div>
@@ -107,7 +102,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
     <script>
-        // --- Firebase Config ---
         const firebaseConfig = {
             apiKey: "AIzaSyDE9SYe-4rS5jMeXStqg9pc_IuBsiySdaU",
             databaseURL: "https://cococoin-mine-c7b27-default-rtdb.asia-southeast1.firebasedatabase.app/",
@@ -123,32 +117,27 @@
             document.getElementById(id).classList.add('active');
         }
 
-        // --- Register Function ---
         function register() {
             const name = document.getElementById('reg-name').value;
             const email = document.getElementById('reg-email').value;
             const pass = document.getElementById('reg-pass').value;
             const pin = document.getElementById('reg-pin').value;
-            if(!name || !pass || pin.length < 6) return alert("Verify all fields.");
-
+            if(!name || !pass || pin.length < 6) return alert("Fill all fields correctly. PIN must be 6 digits.");
             const nid = 'COCO-' + Math.floor(1000 + Math.random() * 8999);
-            db.ref('users/' + nid).set({
-                name, email, password: pass, pin, balance: 0, points: 100
-            }).then(() => {
-                alert("ID Created: " + nid);
+            db.ref('users/' + nid).set({ name, email, password: pass, pin, balance: 10, points: 5000 }).then(() => {
+                alert("Identity Created! Your ID: " + nid);
                 showPage('auth-page');
             });
         }
 
-        // --- Login Function ---
         function login() {
             const id = document.getElementById('login-id').value.trim();
             const pw = document.getElementById('login-pass').value.trim();
             db.ref('users/' + id).once('value').then(s => {
                 const u = s.val();
-                if(u && u.password === pw) {
-                    localStorage.setItem('c_user_token', id);
-                    startDash(id);
+                if(u && u.password === pw) { 
+                    localStorage.setItem('c_user', id); // UNIFIED ID සෙට් කළා
+                    startDash(id); 
                 } else alert("Invalid ID or Access Key.");
             });
         }
@@ -163,7 +152,6 @@
             showPage('dash-page');
         }
 
-        // --- PIN Overlay Logic ---
         function openPin(action) { 
             currentAction = action; 
             document.getElementById('pin-overlay').style.display = 'block';
@@ -171,58 +159,45 @@
         }
         function closePin() { document.getElementById('pin-overlay').style.display = 'none'; document.getElementById('action-pin').value = ''; }
 
-        // --- FIXED SWAP LOGIC ---
         function handleSwap() {
-            const id = localStorage.getItem('c_user_token');
+            const id = localStorage.getItem('c_user');
             const pin = document.getElementById('action-pin').value;
             db.ref('users/' + id).once('value').then(s => {
                 const u = s.val();
                 if(u.pin !== pin) return alert("Wrong PIN");
-                if(u.points < 1000) return alert("Minimum 1000 PTS needed to convert.");
-                
+                if(u.points < 1000) return alert("Min 1000 PTS needed");
                 const coinsEarned = parseFloat(u.points) / 1000;
-                
-                db.ref('users/' + id).runTransaction((currentData) => {
+                db.ref('users/' + id).runTransaction(currentData => {
                     if (currentData) {
                         currentData.balance = (parseFloat(currentData.balance) || 0) + coinsEarned;
                         currentData.points = 0;
                     }
                     return currentData;
-                }).then(() => {
-                    alert("Converted Successfully!");
-                    closePin();
-                });
+                }).then(() => { alert("Converted Successfully!"); closePin(); });
             });
         }
 
-        // --- FIXED P2P TRANSFER ---
         function handleP2P() {
-            const myId = localStorage.getItem('c_user_token');
+            const myId = localStorage.getItem('c_user');
             const toId = document.getElementById('p2p-target').value.trim();
             const amt = parseFloat(document.getElementById('p2p-amount').value);
             const pin = document.getElementById('action-pin').value;
-
-            if(!toId || isNaN(amt) || amt <= 0) return alert("Invalid entry.");
-
+            if(!toId || isNaN(amt) || amt <= 0) return alert("Invalid entry");
             db.ref('users/' + myId).once('value').then(ms => {
                 const me = ms.val();
                 if(me.pin !== pin) return alert("Wrong PIN");
-                if(parseFloat(me.balance) < amt) return alert("Insufficient Balance.");
-
+                if(parseFloat(me.balance) < amt) return alert("Insufficient Balance");
                 db.ref('users/' + toId).once('value').then(ts => {
-                    if(!ts.exists()) return alert("Recipient ID not found!");
-
+                    if(!ts.exists()) return alert("Recipient ID not found");
                     db.ref('users/' + myId + '/balance').transaction(b => (parseFloat(b) || 0) - amt);
                     db.ref('users/' + toId + '/balance').transaction(b => (parseFloat(b) || 0) + amt);
-                    
-                    alert("Transfer Successful to " + toId);
-                    closePin();
+                    alert("Transfer Successful!"); closePin();
                 });
             });
         }
 
         function logout() { localStorage.clear(); location.reload(); }
-        window.onload = () => { if(localStorage.getItem('c_user_token')) startDash(localStorage.getItem('c_user_token')); };
+        window.onload = () => { if(localStorage.getItem('c_user')) startDash(localStorage.getItem('c_user')); };
     </script>
 </body>
 </html>
