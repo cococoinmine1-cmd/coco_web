@@ -3,73 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>COCO SOVEREIGN CORE V6</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
+    <title>COCO SOVEREIGN CORE V5 - UNIFIED</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&family=Inter:wght@300;600;800&display=swap" rel="stylesheet">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root { --gold: #f1c40f; --bg: #000; --border: #1a1a1a; }
-        body { background: var(--bg); color: white; margin: 0; font-family: sans-serif; overflow: hidden; }
+        :root { --gold: #f1c40f; --bg: #000; --card: #0a0a0a; --border: #1a1a1a; --green: #00ff88; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Inter', sans-serif; margin: 0; padding: 0; }
+        body { background: var(--bg); color: white; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
+        #auth-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; padding: 30px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .auth-input { width: 100%; padding: 15px; background: #070707; border: 1px solid #222; color: #fff; border-radius: 12px; margin-bottom: 12px; text-align: center; }
 
-/* මැද රවුම සහ ලොගෝ එක හරියටම සෙට් කරන කෝඩ් එක */
-.core-btn {
-    width: 250px;
-    height: 250px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
-    border: 5px solid #111;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    margin: 40px auto;
-    box-shadow: 0 0 50px rgba(0,0,0,1), inset 0 0 20px rgba(241, 196, 15, 0.1);
-    cursor: pointer;
-    transition: transform 0.1s;
-}
+        .header { background: #000; padding: 15px; border-bottom: 1px solid var(--border); text-align: center; font-family: 'Orbitron'; font-size: 10px; color: var(--gold); letter-spacing: 2px; }
+        .content { flex: 1; overflow-y: auto; padding-bottom: 100px; width: 100%; max-width: 500px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+        .page { display: none; width: 100%; padding: 20px; text-align: center; }
+        .page.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.core-btn:active {
-    transform: scale(0.95);
-}
+        .vault-card { width: 100%; background: linear-gradient(145deg, #050505, #111); border: 1px solid var(--border); border-radius: 25px; padding: 25px; margin: 20px 0; border-left: 5px solid var(--gold); }
+        .bal-val { font-family: 'Orbitron'; font-size: 42px; font-weight: 900; color: #fff; margin: 5px 0; }
+        
+        .core-btn { width: 230px; height: 230px; border-radius: 50%; background: radial-gradient(circle, #1a1a1a, #000); border: 5px solid var(--border); margin: 30px auto; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; transition: transform 0.1s; box-shadow: 0 0 50px rgba(0,0,0,1); }
+        .core-btn:active { transform: scale(0.92); border-color: var(--gold); }
+        .coco-emoji { font-size: 100px; filter: drop-shadow(0 0 15px var(--gold)); pointer-events: none; }
 
-/* මෙන්න මේකයි වැදගත්ම කෑල්ල - Image එක රවුමට මැදි කරන හැටි */
-.core-btn img {
-    width: 100%; /* රවුම ඇතුළටම පිරෙන්න */
-    height: 100%;
-    border-radius: 50%; /* රූපයත් රවුම් වෙන්න */
-    object-fit: cover; /* රූපය ඇද නොවී ලස්සනට පේන්න */
-    pointer-events: none;
-    filter: drop-shadow(0 0 15px rgba(241, 196, 15, 0.5));
-}
+        .float-text { position: absolute; color: var(--gold); font-weight: 900; font-size: 26px; animation: floatUp 0.6s forwards; pointer-events: none; }
+        @keyframes floatUp { to { opacity: 0; transform: translateY(-120px); } }
 
-        .bal-val { font-size: 40px; color: #fff; }
+        .card { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 15px; padding: 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+        .btn-action { background: var(--gold); color: #000; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 800; font-size: 11px; cursor: pointer; text-transform: uppercase; }
+
+        .nav { position: fixed; bottom: 0; width: 100%; max-width: 500px; left: 50%; transform: translateX(-50%); display: flex; background: #000; border-top: 1px solid var(--border); padding: 18px 0; z-index: 1000; }
+        .nav-item { flex: 1; font-size: 9px; color: #444; text-align: center; cursor: pointer; font-weight: 900; letter-spacing: 1px; }
+        .nav-item.active { color: var(--gold); }
     </style>
 </head>
 <body>
 
-    <div class="balance-card">
-        <small style="color:var(--gold)">SECURE ASSETS</small>
-        <div class="bal-val" id="balance">0.00</div>
+    <div id="auth-screen">
+        <h2 style="font-family:'Orbitron'; color:var(--gold); margin-bottom:10px;">UNIFIED ACCESS</h2>
+        <p style="font-size:10px; color:#444; margin-bottom:20px;">LINK YOUR SOVEREIGN ID</p>
+        <input type="text" id="auth-id" class="auth-input" placeholder="COCO-ID (e.g. COCO-1234)">
+        <input type="password" id="auth-pass" class="auth-input" placeholder="ACCESS KEY">
+        <button class="btn-action" style="width:100%; padding:18px;" onclick="unifyLogin()">UNIFY & SYNC</button>
     </div>
-    <div class="core-btn" id="tap-btn">
-    <img src="https://i.ibb.co/vzR0Y4m/gold-coco.png" alt="COCO MINER">
-</div>
 
+    <div class="header">🛡️ COCO SOVEREIGN SECURE CORE</div>
 
+    <div class="content">
+        <div id="mine" class="page active">
+            <div class="vault-card">
+                <p style="color:#666; font-size:10px; letter-spacing:2px;">SECURE ASSETS</p>
+                <div class="bal-val" id="balance">0.00</div>
+                <div id="display-id" style="color:var(--gold); font-size:9px;">SYNCING ID...</div>
+            </div>
+            <div class="core-btn" id="tap-btn">
+                <span class="coco-emoji">🥥</span> 
+            </div>
+            <div style="font-size:14px; margin-top:10px;">⚡ <span id="energy">1000</span> / <span id="max-energy">1000</span></div>
+        </div>
+
+        <div id="tasks" class="page">
+            <h3 style="margin-bottom:20px; font-family:'Orbitron'; color:var(--gold);">MISSIONS</h3>
+            <div class="card"><div><b>YouTube Mission</b><br><small>Subscribe & Watch</small></div><button class="btn-action" onclick="window.open('https://youtube.com/@cococoin-i9m?si=LQ-WTjpo1SCsgpQn')">+3k</button></div>
+            <div class="card"><div><b>TikTok Mission</b><br><small>Follow & Like</small></div><button class="btn-action" onclick="window.open('https://www.tiktok.com/@coco.coin0?_r=1&_t=ZS-93N9riatjyD')">+3k</button></div>
+            <div class="card"><div><b>Facebook Mission</b><br><small>Like & Share</small></div><button class="btn-action" onclick="window.open('https://www.facebook.com/share/1D3h6b2HQU/')">+3k</button></div>
+            <div class="card"><div><b>Telegram News</b><br><small>Join Channel</small></div><button class="btn-action" onclick="window.open('https://t.me/+5yPR6-ct7VYyMGVl')">+1.5k</button></div>
+            <div class="card"><div><b>Telegram chat</b><br><small>Join Channel</small></div><button class="btn-action" onclick="window.open('https://t.me/+jXHAmoMmUVc3MjU1')">+1.5k</button></div>
+            <div class="card"><div><b>coco miner</b><br><small>register account</small></div><button class="btn-action" onclick="window.open('https://cococoinmine1-cmd.github.io/Mycoco/mining.html')">+1.5k</button></div>
+            
+            <div class="account-alert" style="background: linear-gradient(90deg, #ffcc00, #ff9900); padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: center; color: #000; margin-top: 20px;">
+                <p style="margin: 0; font-weight: bold; font-size: 14px;">🚀 Don't delay! Start your COCO account now.</p>
+                <button onclick="window.location.href='https://cococoinmine1-cmd.github.io/Mycoco/vault.html'" style="margin-top: 10px; background: #000; color: #fff; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 900; cursor: pointer; font-size: 12px;">START ACCOUNT</button>
+            </div>
+        </div>
+
+        <div id="friends" class="page">
+            <h3 style="margin-bottom:20px; font-family:'Orbitron';">NETWORK</h3>
+            <div class="card" style="display:block; text-align:center;">
+                <p style="font-size:10px; margin-bottom:10px;">YOUR INVITE LINK</p>
+                <div id="ref-link" style="background:#000; padding:15px; border:1px dashed #333; font-size:10px; color:var(--gold); margin-bottom:10px; word-break:break-all;"></div>
+                <button class="btn-action" style="width:100%" onclick="copyRef()">COPY LINK</button>
+            </div>
+        </div>
+
+        <div id="vault" class="page">
+            <h3 style="margin-bottom:20px; font-family:'Orbitron';">SECURE VAULT</h3>
+            <div class="card"><div><b>Multitap Upgrade</b><br><small>Level Up</small></div><button class="btn-action" onclick="buyBoost()">UPGRADE</button></div>
+            <div class="card" style="display:block; margin-top:20px;">
+                <p style="font-size:10px; color:#888; margin-bottom:10px;">WITHDRAW ASSETS</p>
+                <input type="text" id="wallet-addr" placeholder="ENTER COCO ADDRESS" style="width:100%; background:#000; border:1px solid #222; padding:15px; color:white; border-radius:10px; margin-bottom:15px;">
+                <button class="btn-action" style="width:100%" onclick="alert('Audit in Progress. Use 6-Digit PIN in Phase 2.')">INITIATE WITHDRAWAL</button>
+            </div>
+        </div>
+    </div>
+
+    <nav class="nav">
+        <div class="nav-item active" onclick="showPage('mine', this)">MINER</div>
+        <div class="nav-item" onclick="showPage('tasks', this)">TASKS</div>
+        <div class="nav-item" onclick="showPage('friends', this)">FRIENDS</div>
+        <div class="nav-item" onclick="showPage('vault', this)">VAULT</div>
+    </nav>
+
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
 
     <script>
-        // ටැප් කරනකොට වැඩ කරන පොඩි කෝඩ් එකක්
-        let bal = 0;
-        const btn = document.getElementById('tap-btn');
-        const disp = document.getElementById('balance');
+        const firebaseConfig = {
+            apiKey: "AIzaSyDE9SYe-4rS5jMeXStqg9pc_IuBsiySdaU",
+            databaseURL: "https://cococoin-mine-c7b27-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "cococoin-mine-c7b27"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        btn.addEventListener('touchstart', (e) => {
+        // Wallet එකේ පාවිච්චි කරන 'c_user' key එකම මෙතනටත් ලින්ක් කළා
+        let currentId = localStorage.getItem('c_user');
+        let balance = 0, energy = 1000, maxEnergy = 1000, multi = 1;
+
+        if(currentId) {
+            document.getElementById('auth-screen').style.display = 'none';
+            loadData(currentId);
+        }
+
+        function unifyLogin() {
+            const id = document.getElementById('auth-id').value.trim();
+            const pw = document.getElementById('auth-pass').value.trim();
+            db.ref('users/' + id).once('value').then(s => {
+                const u = s.val();
+                if(u && u.password === pw) {
+                    localStorage.setItem('c_user', id);
+                    location.reload();
+                } else alert("Invalid COCO-ID or Access Key!");
+            });
+        }
+
+        function loadData(id) {
+            db.ref('users/' + id).on('value', (snap) => {
+                const data = snap.val();
+                if(data) {
+                    balance = Number(data.points) || 0;
+                    multi = data.multi || 1;
+                    updateUI(id);
+                }
+            });
+        }
+
+        function updateUI(id) {
+            document.getElementById('balance').innerText = balance.toLocaleString(undefined, {minimumFractionDigits: 2});
+            document.getElementById('energy').innerText = Math.floor(energy);
+            document.getElementById('display-id').innerText = "SECURE ID: " + id;
+            document.getElementById('ref-link').innerText = "https://t.me/COCO_COIN_BOT?start=" + id;
+        }
+
+        document.getElementById('tap-btn').addEventListener('touchstart', (e) => {
             e.preventDefault();
-            bal += 1;
-            disp.innerText = bal.toFixed(2);
+            if(!currentId || energy < multi) return;
+            balance += multi; 
+            energy -= multi;
             
-            // Vibrating for feel
-            if(navigator.vibrate) navigator.vibrate(30);
+            // කෙලින්ම Wallet එකේ පේන 'points' field එකට කොටනවා
+            db.ref('users/' + currentId).update({ points: balance });
+
+            const t = e.touches[0];
+            const f = document.createElement('div');
+            f.className = 'float-text'; f.innerText = '+' + multi;
+            f.style.left = t.clientX + 'px'; f.style.top = t.clientY + 'px';
+            document.body.appendChild(f);
+            setTimeout(() => f.remove(), 600);
+            if(navigator.vibrate) navigator.vibrate(25);
         });
+
+        function showPage(id, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function copyRef() {
+            navigator.clipboard.writeText(document.getElementById('ref-link').innerText);
+            alert("Invite Link Copied!");
+        }
+
+        function buyBoost() {
+            let cost = multi * 2000;
+            if(balance < cost) return alert("Not enough assets!");
+            balance -= cost; 
+            multi++;
+            db.ref('users/' + currentId).update({ points: balance, multi: multi });
+        }
+
+        setInterval(() => { if(energy < maxEnergy) { energy += 1.5; updateUI(currentId); } }, 1000);
     </script>
 </body>
 </html>
