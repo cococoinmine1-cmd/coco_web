@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Live Sync Fix</title>
+    <title>Ghost Driver - Pro Final</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -48,7 +48,7 @@
     </div>
 
     <div class="history-panel">
-        <div id="historyList" style="font-size: 10px; color: #777;">ජාලයට සම්බන්ධ වෙමින්...</div>
+        <div id="historyList" style="font-size: 10px; color: #777;">සම්බන්ධ වෙමින්...</div>
     </div>
 </div>
 
@@ -58,18 +58,16 @@
 
 <script>
     const firebaseConfig = {
-        apiKey: "මෙතනට_උඹේ_API_KEY_එක_දාපන්", 
+        apiKey: "මෙතනට_උඹේ_API_KEY_දාපන්", 
         authDomain: "cococoin-mine.firebaseapp.com",
         databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
         projectId: "cococoin-mine",
         storageBucket: "cococoin-mine.appspot.com",
-        messagingSenderId: "මෙතනට_SENDER_ID_එක_දාපන්",
-        appId: "මෙතනට_APP_ID_එක_දාපන්"
+        messagingSenderId: "මෙතනට_SENDER_ID_දාපන්",
+        appId: "මෙතනට_APP_ID_දාපන්"
     };
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline;
@@ -107,6 +105,7 @@
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
+        // setView: false නිසා මැප් එක අඳිනකොට මුලට පනින්නේ නැත
         map.locate({setView: false, watch: true, maxZoom: 15});
         map.on('locationfound', (e) => {
             if(!realMarker) {
@@ -123,9 +122,9 @@
     function reCenter() { if(realMarker) map.setView(realMarker.getLatLng(), 15); }
 
     function listenToNetwork() {
-        // 1. Live Fleet Update (අනිත් අය පෙන්වීම)
-        db.ref('fleet').on('value', (snapshot) => {
-            const data = snapshot.val();
+        // අනිත් අයගේ පිහිටීම Update කිරීම
+        db.ref('fleet').on('value', (snap) => {
+            const data = snap.val();
             if(!data) return;
             Object.keys(data).forEach(id => {
                 if(id !== driverID) {
@@ -141,13 +140,10 @@
             });
         });
 
-        // 2. Shared Routes Update (මේක තමයි ලෙඩේ තිබ්බ තැන - දැන් Live Update වෙනවා)
-        db.ref('shared_routes').on('value', (snapshot) => {
+        // සේව් කරපු රූට්ස් සජීවීව පෙන්වීම
+        db.ref('shared_routes').on('value', (snap) => {
             const history = [];
-            snapshot.forEach((child) => {
-                let routeData = child.val();
-                history.unshift(routeData);
-            });
+            snap.forEach((child) => history.unshift(child.val()));
             renderHistory(history);
         });
     }
@@ -155,7 +151,7 @@
     function renderHistory(history) {
         let listDiv = document.getElementById('historyList');
         if(history.length === 0) {
-            listDiv.innerHTML = "<div style='color:#555; text-align:center;'>තවම රූට්ස් සේව් කරලා නැත.</div>";
+            listDiv.innerHTML = "<div style='color:#555; text-align:center;'>No routes shared yet</div>";
             return;
         }
         listDiv.innerHTML = history.map(r => `
@@ -195,36 +191,31 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("පාරක් ඇඳලා හිටපන්!");
+        if(routePoints.length < 2) return alert("පාරක් අඳින්න!");
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
         
-        // සර්වර් එකට සේව් කරනවා
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         }).then(() => {
             isGhosting = true;
-            startGhosting();
-        }).catch(err => alert("සේව් වුණේ නැත!"));
-    }
-
-    function startGhosting() {
-        let i = 0;
-        function move() {
-            if(i < routePoints.length) {
-                let speed = (i < routePoints.length * 0.1) ? 10 : 25;
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
-                let currentPoint = routePoints[Math.floor(i)];
-                ghostMarker.setLatLng(currentPoint);
-                map.panTo(currentPoint);
-                i += (speed === 10) ? 0.3 : 0.7; 
-                setTimeout(move, 150);
-            } else {
-                isGhosting = false;
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
+            let i = 0;
+            function move() {
+                if(i < routePoints.length) {
+                    let speed = (i < routePoints.length * 0.1) ? 10 : 25;
+                    document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
+                    let currentPoint = routePoints[Math.floor(i)];
+                    ghostMarker.setLatLng(currentPoint);
+                    map.panTo(currentPoint);
+                    i += (speed === 10) ? 0.3 : 0.7; 
+                    setTimeout(move, 150);
+                } else {
+                    isGhosting = false;
+                    document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
+                }
             }
-        }
-        move();
+            move();
+        });
     }
 
     window.loadRouteData = function(id) {
@@ -242,9 +233,7 @@
     }
 
     window.deleteRoute = function(id) {
-        if(confirm("මෙම රූට් එක මකන්නද?")) {
-            db.ref('shared_routes/' + id).remove();
-        }
+        if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove();
     }
 
     function clearRoute() {
