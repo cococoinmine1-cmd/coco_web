@@ -3,50 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Master Control</title>
+    <title>Ghost Driver - Pro Control</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 50vh; width: 100%; }
+        #map { height: 45vh; width: 100%; }
         .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
-        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: none; font-size: 15px; box-sizing: border-box; }
+        input, button { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
         input { background: #333; color: white; }
         .btn-main { background: #27ae60; color: white; font-weight: bold; }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: #2ecc71; font-size: 14px; }
-        .controls { display: flex; gap: 8px; }
-        /* History Box styling */
-        .history-panel { background: #111; border-radius: 8px; padding: 8px; margin-top: 10px; max-height: 80px; overflow-y: auto; border: 1px solid #333; }
-        .history-item { padding: 8px; border-bottom: 1px solid #222; font-size: 12px; color: #3498db; cursor: pointer; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
+        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 80px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
+        .history-item { padding: 6px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; cursor: pointer; }
+        #townList { font-size: 10px; color: #aaa; height: 30px; overflow: hidden; font-style: italic; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <h1 style="color: #27ae60;">Ghost Driver</h1>
-    <p>වාහනයට අකුරක් ලබා දෙන්න (A, B, C...)</p>
     <input type="text" id="uID" placeholder="Driver ID (e.g. A)">
     <button class="btn-main" onclick="saveUser()">REGISTER</button>
 </div>
 
 <div id="map"></div>
-
 <div class="panel">
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
     </div>
+    
+    <div id="townList">Passing through: Select points...</div>
 
+    <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න (e.g. Town to Home)">
     <input type="number" id="targetTime" placeholder="කාලය (විනාඩි වලින්)">
     
-    <div class="controls">
+    <div style="display:flex; gap:5px;">
         <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (START)</button>
         <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 25%;">CLEAR</button>
         <button onclick="logout()" style="background:#c0392b; color:white; width: 25%;">EXIT</button>
     </div>
 
     <div class="history-panel" id="historyBox">
-        <div style="font-size: 11px; color: #888; margin-bottom: 4px;">SAVED ROUTES (Touch to Load):</div>
         <div id="historyList"></div>
     </div>
 </div>
@@ -56,11 +55,8 @@
     let map = L.map('map').setView([6.9271, 79.8612], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    let driverID, realMarker, ghostMarker;
-    let routePoints = [];
+    let driverID, realMarker, ghostMarker, routePoints = [], totalKm = 0, isGhosting = false;
     let polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
-    let totalKm = 0;
-    let isGhosting = false;
 
     window.onload = function() {
         let saved = localStorage.getItem('driver_letter');
@@ -75,21 +71,18 @@
 
     function saveUser() {
         let id = document.getElementById('uID').value.toUpperCase();
-        if(!id) return alert("කරුණාකර ID එකක් ඇතුළත් කරන්න!");
+        if(!id) return;
         localStorage.setItem('driver_letter', id);
         location.reload();
     }
 
-    function logout() {
-        localStorage.removeItem('driver_letter');
-        location.reload();
-    }
+    function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
         map.locate({setView: true, maxZoom: 15});
         map.on('locationfound', (e) => {
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db'}).addTo(map);
+                realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
             }
         });
@@ -100,80 +93,70 @@
         let last = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (realMarker ? realMarker.getLatLng() : e.latlng);
         
         fetch(`https://router.project-osrm.org/route/v1/driving/${last.lng},${last.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
-        .then(res => res.json())
-        .then(data => {
+        .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
-                let coords = data.routes[0].geometry.coordinates;
-                coords.forEach(c => {
-                    let p = [c[1], c[0]];
-                    routePoints.push(p);
-                    polyline.addLatLng(p);
+                data.routes[0].geometry.coordinates.forEach(c => {
+                    routePoints.push([c[1], c[0]]);
+                    polyline.addLatLng([c[1], c[0]]);
                 });
                 totalKm += data.routes[0].distance / 1000;
                 document.getElementById('km').innerText = totalKm.toFixed(2);
+                getPlaceName(e.latlng);
             }
         });
     });
 
+    function getPlaceName(latlng) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
+        .then(res => res.json()).then(data => {
+            let place = data.address.suburb || data.address.town || data.address.village || "Unknown";
+            document.getElementById('townList').innerText += " > " + place;
+        });
+    }
+
     function confirmRoute() {
         let mins = document.getElementById('targetTime').value;
-        if(routePoints.length < 2 || !mins) return alert("පාර ඇඳ කාලය ඇතුළත් කරන්න!");
+        let rName = document.getElementById('routeName').value || "Unnamed Route";
+        if(routePoints.length < 2 || !mins) return alert("පාර සහ කාලය ඇතුළත් කරන්න!");
 
-        // Start වෙද්දීම route එක save කරනවා
-        saveRouteData();
-
+        saveRouteData(rName);
         isGhosting = true;
-        document.getElementById('okBtn').innerText = "DRIVING...";
         
-        let intervalTime = (mins * 60 * 1000) / routePoints.length; 
         let i = 0;
+        let totalSteps = routePoints.length;
+        let duration = mins * 60 * 1000;
+        let stepTime = duration / totalSteps;
 
-        function move() {
+        function moveSmoothly() {
             if(i < routePoints.length) {
                 ghostMarker.setLatLng(routePoints[i]);
                 map.panTo(routePoints[i]);
                 console.log(`${driverID}:${routePoints[i][0]},${routePoints[i][1]}`);
                 i++;
-                setTimeout(move, intervalTime);
+                setTimeout(moveSmoothly, stepTime);
             } else {
                 alert("Destination Reached!");
                 isGhosting = false;
-                document.getElementById('okBtn').innerText = "OK (START)";
             }
         }
-        move();
+        moveSmoothly();
     }
 
-    // Route එක Phone memory එකට සේව් කිරීම
-    function saveRouteData() {
+    function saveRouteData(name) {
         let history = JSON.parse(localStorage.getItem('ghost_history') || '[]');
-        let newRoute = {
-            id: Date.now(),
-            km: totalKm.toFixed(2),
-            points: routePoints,
-            time: new Date().toLocaleString()
-        };
-        history.unshift(newRoute); // අලුත් එක උඩටම ගන්නවා
-        if(history.length > 10) history.pop(); // උපරිම 10ක් තියාගන්නවා
-        localStorage.setItem('ghost_history', JSON.stringify(history));
+        history.unshift({id: Date.now(), name: name, km: totalKm.toFixed(2), points: routePoints});
+        localStorage.setItem('ghost_history', JSON.stringify(history.slice(0,10)));
         loadHistory();
     }
 
-    // සේව් කරපු පාරවල් ලිස්ට් එක පෙන්වීම
     function loadHistory() {
         let history = JSON.parse(localStorage.getItem('ghost_history') || '[]');
-        let listHtml = "";
-        history.forEach(route => {
-            listHtml += `<div class="history-item" onclick="loadSelectedRoute(${route.id})">
-                Route: ${route.km} KM (${route.time.split(',')[1]})
-            </div>`;
-        });
-        document.getElementById('historyList').innerHTML = listHtml || "No saved routes.";
+        document.getElementById('historyList').innerHTML = history.map(r => 
+            `<div class="history-item" onclick="loadSelectedRoute(${r.id})">${r.name} (${r.km} KM)</div>`
+        ).join('');
     }
 
-    // History එකෙන් එකක් තෝරාගත් විට load කිරීම
     window.loadSelectedRoute = function(id) {
-        if(isGhosting) return;
         let history = JSON.parse(localStorage.getItem('ghost_history') || '[]');
         let selected = history.find(r => r.id === id);
         if(selected) {
@@ -182,16 +165,15 @@
             polyline.setLatLngs(routePoints);
             totalKm = parseFloat(selected.km);
             document.getElementById('km').innerText = selected.km;
+            document.getElementById('routeName').value = selected.name;
             map.fitBounds(polyline.getBounds());
-            alert("Route Loaded! Enter time and press OK.");
         }
     }
 
     function clearRoute() {
-        routePoints = [];
-        polyline.setLatLngs([]);
-        totalKm = 0;
+        routePoints = []; polyline.setLatLngs([]); totalKm = 0;
         document.getElementById('km').innerText = "0.00";
+        document.getElementById('townList').innerText = "Passing through: ";
     }
 </script>
 </body>
