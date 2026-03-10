@@ -3,100 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Fleet Pro - Master Control</title>
+    <title>Ghost Driver - Control Panel</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: sans-serif; background: #121212; color: white; overflow: hidden; }
-        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 55vh; width: 100%; }
-        .panel { padding: 15px; background: #1f1f1f; border-radius: 20px 20px 0 0; margin-top: -20px; position: relative; z-index: 1000; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: #2ecc71; font-size: 14px; }
-        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: none; box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
+        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        #map { height: 65vh; width: 100%; }
+        .panel { padding: 20px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
+        input, button { width: 100%; padding: 14px; margin-bottom: 15px; border-radius: 10px; border: none; font-size: 16px; box-sizing: border-box; }
         input { background: #333; color: white; }
-        button { font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-start { background: #3498db; color: white; }
-        .btn-share { background: #f39c12; color: white; }
-        .speed-ctrl { background: #222; padding: 10px; border-radius: 8px; margin-top: 5px; text-align: center; }
-        #log { font-size: 11px; color: #aaa; height: 40px; overflow-y: auto; margin-top: 5px; border-left: 2px solid #3498db; padding-left: 5px; }
+        .btn-main { background: #27ae60; color: white; font-weight: bold; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; color: #2ecc71; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .speed-info { font-size: 13px; color: #aaa; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <h2 style="color: #3498db;">Ghost Fleet Register</h2>
-    <input type="text" id="uName" placeholder="Driver ID (A, B, C...)">
-    <input type="text" id="vNo" placeholder="Vehicle Number">
-    <button onclick="register()" style="background:#27ae60; color:white;">JOIN & START</button>
+    <h1 style="color: #27ae60;">Ghost Driver</h1>
+    <p>Register your unique Driver ID</p>
+    <input type="text" id="uID" placeholder="Enter Driver Letter (e.g. A, B, C)">
+    <button class="btn-main" onclick="saveUser()">REGISTER</button>
 </div>
 
 <div id="map"></div>
+
 <div class="panel">
     <div class="stats">
-        <span>ID: <span id="dispID">-</span></span>
-        <span>Dist: <span id="km">0.00</span> KM</span>
+        <span>Driver: <span id="dispID" style="color:#3498db">-</span></span>
+        <span>Distance: <span id="km">0.00</span> KM</span>
     </div>
 
-    <div id="log">Click on map to draw route...</div>
+    <div class="speed-info" id="speedStatus">Set route and enter time to calculate speed</div>
 
-    <div style="display:flex; gap:8px;">
-        <button class="btn-start" onclick="startGhostDrive()">START SIM</button>
-        <button class="btn-share" onclick="shareToAll()">SHARE ROUTE</button>
-        <button onclick="loadShared()" style="background:#9b59b6; color:white; flex:1;">LOAD SHARED</button>
-    </div>
-
-    <div class="speed-ctrl">
-        Speed: <input type="range" id="speed" min="10" max="250" value="100" style="width:70%; margin:0;"> 
-        <span id="spText">100</span> km/h
-    </div>
+    <input type="number" id="targetTime" placeholder="Target Time (Minutes)">
     
-    <button onclick="localStorage.clear(); location.reload();" style="background:#c0392b; color:white; padding:8px; margin-top:5px; font-size:11px;">LOGOUT / RESET</button>
+    <div style="display:flex; gap:10px;">
+        <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (Start Fake GPS)</button>
+        <button onclick="resetMap()" style="background:#c0392b; color:white; width: 30%;">RESET</button>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map = L.map('map').setView([6.9271, 79.8612], 13);
+    let map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let driverID, realMarker, ghostMarker;
-    let currentRoute = [];
+    let routePoints = [];
     let polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
-    let totalDist = 0;
+    let totalKm = 0;
+    let isGhosting = false;
 
-    // Auto Login Check
+    // Check if user already registered
     window.onload = function() {
-        let savedID = localStorage.getItem('ghost_id');
-        if(savedID) {
-            driverID = savedID;
+        let saved = localStorage.getItem('driver_letter');
+        if(saved) {
+            driverID = saved;
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('dispID').innerText = driverID;
             initGPS();
         }
     };
 
-    function register() {
-        driverID = document.getElementById('uName').value.toUpperCase();
-        if(!driverID) return alert("ID එකක් දාන්න!");
-        localStorage.setItem('ghost_id', driverID);
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('dispID').innerText = driverID;
-        initGPS();
+    function saveUser() {
+        let id = document.getElementById('uID').value.toUpperCase();
+        if(!id) return alert("Enter an ID!");
+        localStorage.setItem('driver_letter', id);
+        location.reload();
     }
 
     function initGPS() {
         map.locate({setView: true, watch: true, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db'}).addTo(map);
-                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip("Vehicle " + driverID, {permanent: true});
-            } else {
+                // Real Position Blue Dot
+                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db', fillOpacity: 0.8}).addTo(map);
+                // Ghost Vehicle Marker (with ID)
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
+            } else if(!isGhosting) {
                 realMarker.setLatLng(e.latlng);
+                ghostMarker.setLatLng(e.latlng);
             }
         });
     }
 
-    // Road Snapping Route Drawing
+    // Drawing route with snapping
     map.on('click', function(e) {
-        let last = currentRoute.length > 0 ? currentRoute[currentRoute.length - 1] : realMarker.getLatLng();
+        if(isGhosting) return;
+        let last = routePoints.length > 0 ? routePoints[routePoints.length - 1] : realMarker.getLatLng();
         
         fetch(`https://router.project-osrm.org/route/v1/driving/${last.lng},${last.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json())
@@ -104,49 +99,48 @@
             let coords = data.routes[0].geometry.coordinates;
             coords.forEach(c => {
                 let p = [c[1], c[0]];
-                currentRoute.push(p);
+                routePoints.push(p);
                 polyline.addLatLng(p);
             });
-            totalDist += data.routes[0].distance / 1000;
-            document.getElementById('km').innerText = totalDist.toFixed(2);
-            document.getElementById('log').innerText = "Last Point: " + e.latlng.lat.toFixed(4) + ", " + e.latlng.lng.toFixed(4);
+            totalKm += data.routes[0].distance / 1000;
+            document.getElementById('km').innerText = totalKm.toFixed(2);
         });
     });
 
-    function shareToAll() {
-        if(currentRoute.length === 0) return alert("මුලින් පාරක් අඳින්න!");
-        // සැබෑ Firebase එකක් නැති නිසා දැනට localStorage පාවිච්චි කරයි (Shared memory mock)
-        localStorage.setItem('global_shared_route', JSON.stringify(currentRoute));
-        alert("Route Shared to all 15 Vehicles!");
-    }
+    function confirmRoute() {
+        let mins = document.getElementById('targetTime').value;
+        if(routePoints.length < 2 || !mins) return alert("පාර ඇඳලා විනාඩි ගණන ඇතුළත් කරන්න!");
 
-    function loadShared() {
-        let shared = localStorage.getItem('global_shared_route');
-        if(!shared) return alert("Shared routes කිසිවක් නැත!");
-        currentRoute = JSON.parse(shared);
-        polyline.setLatLngs(currentRoute);
-        map.fitBounds(polyline.getBounds());
-        alert("Shared Route Loaded!");
-    }
+        isGhosting = true;
+        document.getElementById('okBtn').innerText = "DRIVING...";
+        document.getElementById('okBtn').style.background = "#f39c12";
 
-    function startGhostDrive() {
-        if(currentRoute.length === 0) return alert("පාරක් අඳින්න!");
+        // Calculate Speed (Time per point)
+        let totalPoints = routePoints.length;
+        let intervalTime = (mins * 60 * 1000) / totalPoints; 
+        let calculatedSpeed = (totalKm / (mins / 60)).toFixed(1);
+        document.getElementById('speedStatus').innerText = "Auto-calculated Speed: " + calculatedSpeed + " km/h";
+
         let i = 0;
         function move() {
-            let speed = 300 - document.getElementById('speed').value; // UI Speed control
-            if(i < currentRoute.length) {
-                ghostMarker.setLatLng(currentRoute[i]);
-                // මෙතනදී ESP32 එකට data යවන ලොජික් එක වැටෙයි
+            if(i < routePoints.length) {
+                ghostMarker.setLatLng(routePoints[i]);
+                map.panTo(routePoints[i]);
+
+                // ESP32 එකට දත්ත යවන කොටස (DriverID:Lat,Lng)
+                console.log(`${driverID}:${routePoints[i][0]},${routePoints[i][1]}`);
+                
                 i++;
-                setTimeout(move, speed);
+                setTimeout(move, intervalTime);
+            } else {
+                alert("Destination Reached!");
+                resetMap();
             }
         }
         move();
     }
 
-    document.getElementById('speed').oninput = function() {
-        document.getElementById('spText').innerText = this.value;
-    };
+    function resetMap() { location.reload(); }
 </script>
 </body>
 </html>
