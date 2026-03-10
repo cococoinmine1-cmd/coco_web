@@ -3,110 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Fleet Pro - Advanced</title>
+    <title>Ghost Fleet Pro - Realtime</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: sans-serif; background: #121212; color: white; }
-        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        body { margin: 0; font-family: sans-serif; background: #121212; color: white; overflow-x: hidden; }
         #map { height: 50vh; width: 100%; }
-        .panel { padding: 15px; background: #1f1f1f; border-radius: 20px 20px 0 0; margin-top: -15px; position: relative; z-index: 1000; }
-        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: none; box-sizing: border-box; }
-        input { background: #333; color: white; }
-        .btn-reg { background: #27ae60; color: white; font-weight: bold; }
-        .log { font-size: 11px; background: #000; padding: 10px; height: 80px; overflow-y: scroll; color: #2ecc71; border-radius: 5px; }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: #f1c40f; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 20px 20px 0 0; margin-top: -20px; position: relative; z-index: 1000; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: #2ecc71; }
+        .history-box { background: #000; padding: 10px; height: 100px; overflow-y: auto; border-radius: 8px; font-size: 12px; border: 1px solid #333; }
+        .route-item { padding: 8px; border-bottom: 1px solid #222; cursor: pointer; color: #3498db; }
+        button { padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        input { width: 100%; padding: 12px; margin-bottom: 10px; background: #333; color: white; border: none; border-radius: 8px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <h2>Vehicle Register</h2>
-    <input type="text" id="uName" placeholder="Driver ID (e.g. A, B, C)">
-    <input type="text" id="vNo" placeholder="Vehicle No">
-    <button class="btn-reg" onclick="startApp()">REGISTER & LIVE START</button>
+    <h2>Ghost Fleet Login</h2>
+    <input type="text" id="uName" placeholder="Driver ID (A, B, C...)">
+    <button onclick="startApp()" style="background:#27ae60; color:white; width:100%;">START TRACKING</button>
 </div>
 
 <div id="map"></div>
 <div class="panel">
     <div class="stats">
-        <span>ID: <span id="displayID">-</span></span>
-        <span>Distance: <span id="dist">0</span> km</span>
+        <span>Driver: <span id="dispID">-</span></span>
+        <span>KM: <span id="km">0.0</span></span>
     </div>
-    <div class="log" id="locationList">Route Addresses: <br></div>
-    <div style="display:flex; gap:10px; margin-top:10px;">
-        <button onclick="startGhostDrive()" style="background:#3498db; color:white; flex:1;">GHOST DRIVE</button>
-        <button onclick="saveRoute()" style="background:#f39c12; color:white; flex:1;">SAVE ROUTE</button>
+    
+    <div class="history-box" id="historyList">
+        <b>Saved Routes:</b><br>
     </div>
+
+    <div style="display:flex; gap:10px;">
+        <button onclick="startSim()" style="background:#3498db; color:white; flex:1;">GHOST DRIVE</button>
+        <button onclick="saveCurrentRoute()" style="background:#f39c12; color:white; flex:1;">SAVE ROUTE</button>
+    </div>
+    <button onclick="location.reload()" style="background:#c0392b; color:white; width:100%;">RESET MAP</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map = L.map('map').setView([6.9271, 79.8612], 14);
+    let map = L.map('map').setView([6.9271, 79.8612], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    let myMarker, myID, vNum;
-    let routeCoords = [];
-    let routeLine = L.polyline([], {color: '#2ecc71', weight: 5}).addTo(map);
+    let realMarker, ghostMarker, driverID;
+    let currentRoute = [];
+    let polyline = L.polyline([], {color: '#f1c40f', weight: 4}).addTo(map);
 
     function startApp() {
-        myID = document.getElementById('uName').value.toUpperCase();
-        vNum = document.getElementById('vNo').value;
-        if(!myID) return alert("Please enter Driver ID!");
-        
+        driverID = document.getElementById('uName').value.toUpperCase();
+        if(!driverID) return alert("ID එකක් දාපන් මචං!");
         document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('displayID').innerText = myID;
-        
-        // Real-time Location සොයා ගැනීම
-        map.locate({setView: true, watch: true, enableHighAccuracy: true});
-        map.on('locationfound', (e) => {
-            if(!myMarker) {
-                myMarker = L.marker(e.latlng).addTo(map).bindTooltip("Vehicle " + myID, {permanent: true});
-            } else {
-                myMarker.setLatLng(e.latlng);
-            }
-        });
+        document.getElementById('dispID').innerText = driverID;
+        loadHistory();
+        initGPS();
     }
 
-    // පාර දිගේම තිත් ඇඳෙන ලොජික් එක (Road Snapping)
-    map.on('click', function(e) {
-        let lastPoint = routeCoords.length > 0 ? routeCoords[routeCoords.length - 1] : myMarker.getLatLng();
-        let newPoint = e.latlng;
+    // 1. ඇත්තම ලොකේෂන් එක පෙන්වීම
+    function initGPS() {
+        map.locate({setView: true, watch: true, enableHighAccuracy: true});
+        
+        map.on('locationfound', (e) => {
+            if(!realMarker) {
+                // ඇත්තම ඉන්න තැනට නිල් පාට තිතක්
+                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db', fillOpacity: 0.8}).addTo(map);
+                realMarker.bindPopup("You are here").openPopup();
+                
+                // Ghost Drive එකට පාවිච්චි කරන Marker එක
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip("Vehicle " + driverID, {permanent: true});
+            } else {
+                realMarker.setLatLng(e.latlng);
+            }
+        });
+        
+        map.on('locationerror', () => alert("GPS Permission දීපන් මචං!"));
+    }
 
-        // OSRM API එක පාවිච්චි කරලා පාර දිගේ රූට් එක ගන්නවා
-        fetch(`https://router.project-osrm.org/route/v1/driving/${lastPoint.lng},${lastPoint.lat};${newPoint.lng},${newPoint.lat}?overview=full&geometries=geojson`)
+    // 2. පාර ඇඳීම (Road Snapping)
+    map.on('click', function(e) {
+        let last = currentRoute.length > 0 ? currentRoute[currentRoute.length - 1] : realMarker.getLatLng();
+        
+        fetch(`https://router.project-osrm.org/route/v1/driving/${last.lng},${last.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json())
         .then(data => {
             let coords = data.routes[0].geometry.coordinates;
             coords.forEach(c => {
                 let p = [c[1], c[0]];
-                routeCoords.push(p);
-                routeLine.addLatLng(p);
+                currentRoute.push(p);
+                polyline.addLatLng(p);
             });
-            
-            // පාරේ නම ලබාගැනීම
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newPoint.lat}&lon=${newPoint.lng}`)
-            .then(r => r.json())
-            .then(d => {
-                let name = d.address.road || d.address.suburb || "Unknown Road";
-                document.getElementById('locationList').innerHTML += `> ${name}<br>`;
-            });
-
-            // දුර ගණනය කිරීම
             let d = (data.routes[0].distance / 1000).toFixed(2);
-            document.getElementById('dist').innerText = (parseFloat(document.getElementById('dist').innerText) + parseFloat(d)).toFixed(2);
+            document.getElementById('km').innerText = (parseFloat(document.getElementById('km').innerText) + parseFloat(d)).toFixed(2);
         });
     });
 
-    function startGhostDrive() {
-        if(routeCoords.length === 0) return alert("Draw a route first!");
+    // 3. රූට් එක සේව් කිරීම
+    function saveCurrentRoute() {
+        if(currentRoute.length === 0) return;
+        let name = "Route " + new Date().toLocaleTimeString();
+        let allRoutes = JSON.parse(localStorage.getItem('fleet_history') || '[]');
+        allRoutes.push({name: name, data: currentRoute});
+        localStorage.setItem('fleet_history', JSON.stringify(allRoutes));
+        loadHistory();
+        alert("Saved!");
+    }
+
+    // 4. සේව් කරපු පාරවල් පෙන්වීම
+    function loadHistory() {
+        let list = document.getElementById('historyList');
+        list.innerHTML = "<b>Saved Routes:</b><br>";
+        let allRoutes = JSON.parse(localStorage.getItem('fleet_history') || '[]');
+        allRoutes.forEach((r, index) => {
+            let div = document.createElement('div');
+            div.className = 'route-item';
+            div.innerText = r.name;
+            div.onclick = () => {
+                currentRoute = r.data;
+                polyline.setLatLngs(currentRoute);
+                map.fitBounds(polyline.getBounds());
+            };
+            list.appendChild(div);
+        });
+    }
+
+    function startSim() {
+        if(currentRoute.length === 0) return;
         let i = 0;
         function move() {
-            if(i < routeCoords.length) {
-                myMarker.setLatLng(routeCoords[i]);
-                // ESP32 එකට Bluetooth/WiFi හරහා data යැවීම මෙතනදී වෙන්න ඕනේ
-                console.log(`Vehicle ${myID} moving to: ${routeCoords[i]}`);
+            if(i < currentRoute.length) {
+                ghostMarker.setLatLng(currentRoute[i]);
                 i++;
-                setTimeout(move, 500); // Speed එක පාලනය
+                setTimeout(move, 500);
             }
         }
         move();
