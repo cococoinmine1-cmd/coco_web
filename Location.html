@@ -3,26 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Control Panel</title>
+    <title>Ghost Driver - Master Control</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
-        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; }
+        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
         #map { height: 65vh; width: 100%; }
-        .panel { padding: 20px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
-        input, button { width: 100%; padding: 14px; margin-bottom: 15px; border-radius: 10px; border: none; font-size: 16px; box-sizing: border-box; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
+        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: none; font-size: 15px; box-sizing: border-box; }
         input { background: #333; color: white; }
         .btn-main { background: #27ae60; color: white; font-weight: bold; }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; color: #2ecc71; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .speed-info { font-size: 13px; color: #aaa; text-align: center; margin-bottom: 10px; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: #2ecc71; font-size: 14px; }
+        .controls { display: flex; gap: 8px; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <h1 style="color: #27ae60;">Ghost Driver</h1>
-    <p>Register your unique Driver ID</p>
-    <input type="text" id="uID" placeholder="Enter Driver Letter (e.g. A, B, C)">
+    <p>වාහනයට අකුරක් ලබා දෙන්න (A, B, C...)</p>
+    <input type="text" id="uID" placeholder="Driver ID (e.g. A)">
     <button class="btn-main" onclick="saveUser()">REGISTER</button>
 </div>
 
@@ -30,23 +30,24 @@
 
 <div class="panel">
     <div class="stats">
-        <span>Driver: <span id="dispID" style="color:#3498db">-</span></span>
-        <span>Distance: <span id="km">0.00</span> KM</span>
+        <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
+        <span>KM: <span id="km">0.00</span></span>
     </div>
 
-    <div class="speed-info" id="speedStatus">Set route and enter time to calculate speed</div>
-
-    <input type="number" id="targetTime" placeholder="Target Time (Minutes)">
+    <input type="number" id="targetTime" placeholder="කාලය (විනාඩි වලින්)">
     
-    <div style="display:flex; gap:10px;">
-        <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (Start Fake GPS)</button>
-        <button onclick="resetMap()" style="background:#c0392b; color:white; width: 30%;">RESET</button>
+    <div class="controls">
+        <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (START)</button>
+        <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 30%;">CLEAR</button>
+        <button onclick="logout()" style="background:#c0392b; color:white; width: 30%;">LOGOUT</button>
     </div>
+    <div id="speedStatus" style="font-size: 12px; color: #888; text-align: center; margin-top: 5px;">මැප් එකේ ඕනෑම තැනක් ක්ලික් කර පාර අඳින්න.</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 14);
+    // මැප් එක ලෝඩ් කිරීම - මූලිකව කොළඹට සෙට් කර ඇත
+    let map = L.map('map').setView([6.9271, 79.8612], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let driverID, realMarker, ghostMarker;
@@ -55,7 +56,7 @@
     let totalKm = 0;
     let isGhosting = false;
 
-    // Check if user already registered
+    // පරණ දත්ත තිබේදැයි බැලීම
     window.onload = function() {
         let saved = localStorage.getItem('driver_letter');
         if(saved) {
@@ -68,79 +69,84 @@
 
     function saveUser() {
         let id = document.getElementById('uID').value.toUpperCase();
-        if(!id) return alert("Enter an ID!");
+        if(!id) return alert("කරුණාකර ID එකක් ඇතුළත් කරන්න!");
         localStorage.setItem('driver_letter', id);
         location.reload();
     }
 
+    function logout() {
+        localStorage.removeItem('driver_letter');
+        location.reload();
+    }
+
     function initGPS() {
-        map.locate({setView: true, watch: true, enableHighAccuracy: true});
+        map.locate({setView: true, maxZoom: 15}); // මුල් ලොකේෂන් එක පෙන්වීමට පමණයි
         map.on('locationfound', (e) => {
             if(!realMarker) {
-                // Real Position Blue Dot
-                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db', fillOpacity: 0.8}).addTo(map);
-                // Ghost Vehicle Marker (with ID)
-                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
-            } else if(!isGhosting) {
-                realMarker.setLatLng(e.latlng);
-                ghostMarker.setLatLng(e.latlng);
+                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db'}).addTo(map);
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
             }
         });
     }
 
-    // Drawing route with snapping
+    // මැප් එකේ ඕනෑම තැනක ක්ලික් කර රූට් එක ඇඳීම
     map.on('click', function(e) {
         if(isGhosting) return;
-        let last = routePoints.length > 0 ? routePoints[routePoints.length - 1] : realMarker.getLatLng();
         
+        let last = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (realMarker ? realMarker.getLatLng() : e.latlng);
+        
+        // පාර දිගේ ඇඳීමට OSRM API භාවිතා කරයි
         fetch(`https://router.project-osrm.org/route/v1/driving/${last.lng},${last.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json())
         .then(data => {
-            let coords = data.routes[0].geometry.coordinates;
-            coords.forEach(c => {
-                let p = [c[1], c[0]];
-                routePoints.push(p);
-                polyline.addLatLng(p);
-            });
-            totalKm += data.routes[0].distance / 1000;
-            document.getElementById('km').innerText = totalKm.toFixed(2);
+            if(data.routes && data.routes.length > 0) {
+                let coords = data.routes[0].geometry.coordinates;
+                coords.forEach(c => {
+                    let p = [c[1], c[0]];
+                    routePoints.push(p);
+                    polyline.addLatLng(p);
+                });
+                totalKm += data.routes[0].distance / 1000;
+                document.getElementById('km').innerText = totalKm.toFixed(2);
+            }
         });
     });
 
     function confirmRoute() {
         let mins = document.getElementById('targetTime').value;
-        if(routePoints.length < 2 || !mins) return alert("පාර ඇඳලා විනාඩි ගණන ඇතුළත් කරන්න!");
+        if(routePoints.length < 2 || !mins) return alert("පාර ඇඳ කාලය ඇතුළත් කරන්න!");
 
         isGhosting = true;
         document.getElementById('okBtn').innerText = "DRIVING...";
-        document.getElementById('okBtn').style.background = "#f39c12";
-
-        // Calculate Speed (Time per point)
-        let totalPoints = routePoints.length;
-        let intervalTime = (mins * 60 * 1000) / totalPoints; 
-        let calculatedSpeed = (totalKm / (mins / 60)).toFixed(1);
-        document.getElementById('speedStatus').innerText = "Auto-calculated Speed: " + calculatedSpeed + " km/h";
-
+        
+        let intervalTime = (mins * 60 * 1000) / routePoints.length; 
         let i = 0;
+
         function move() {
             if(i < routePoints.length) {
                 ghostMarker.setLatLng(routePoints[i]);
                 map.panTo(routePoints[i]);
-
-                // ESP32 එකට දත්ත යවන කොටස (DriverID:Lat,Lng)
+                
+                // ESP32 වෙත දත්ත යැවීමේ ලොග් එක (DriverID:Lat,Lng)
                 console.log(`${driverID}:${routePoints[i][0]},${routePoints[i][1]}`);
                 
                 i++;
                 setTimeout(move, intervalTime);
             } else {
-                alert("Destination Reached!");
-                resetMap();
+                alert("ගමනාන්තයට පැමිණියා!");
+                isGhosting = false;
+                document.getElementById('okBtn').innerText = "OK (START)";
             }
         }
         move();
     }
 
-    function resetMap() { location.reload(); }
+    function clearRoute() {
+        routePoints = [];
+        polyline.setLatLngs([]);
+        totalKm = 0;
+        document.getElementById('km').innerText = "0.00";
+    }
 </script>
 </body>
 </html>
