@@ -3,70 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver Control</title>
+    <title>Ghost Driver Pro - Fleet</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; background: #121212; color: white; }
-        #map { height: 75vh; width: 100%; }
-        .ui-panel { padding: 15px; text-align: center; background: #1f1f1f; border-top: 2px solid #27ae60; }
-        button { padding: 12px 25px; margin: 5px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        body { margin: 0; font-family: sans-serif; background: #121212; color: white; }
+        #map { height: 55vh; width: 100%; }
+        .panel { padding: 15px; background: #1f1f1f; display: flex; flex-direction: column; gap: 10px; border-radius: 20px 20px 0 0; margin-top: -20px; z-index: 1000; position: relative; }
+        .row { display: flex; justify-content: space-between; gap: 10px; }
+        button { flex: 1; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .save-btn { background: #f39c12; color: white; }
         .start-btn { background: #27ae60; color: white; }
-        .clear-btn { background: #c0392b; color: white; }
-        .speed-box { margin-top: 10px; font-size: 14px; color: #aaa; }
+        .reset-btn { background: #c0392b; color: white; }
+        select { width: 100%; padding: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 5px; }
+        .status { font-size: 12px; color: #2ecc71; text-align: center; height: 15px; }
     </style>
 </head>
 <body>
 
 <div id="map"></div>
+<div class="panel">
+    <div class="status" id="statusBox">Ready to Map</div>
+    
+    <select id="vehicleSelect">
+        <script>
+            // වාහන 15 ස්වයංක්‍රීයව ලැයිස්තුවට එකතු කිරීම
+            for(let i=1; i<=15; i++) {
+                document.write(`<option value="V_${i}">Vehicle ${i < 10 ? '0'+i : i} (ESP32 Controller)</option>`);
+            }
+        </script>
+    </select>
 
-<div class="ui-panel">
-    <button class="start-btn" onclick="startNav()">START SIMULATION</button>
-    <button class="clear-btn" onclick="resetMap()">CLEAR PATH</button>
-    <div class="speed-box">
-        Speed: <input type="range" id="speed" min="10" max="100" value="40"> 
-        <span id="speedDisplay">40</span> km/h
+    <div class="row">
+        <button onclick="saveSharedRoute()" class="save-btn">SAVE SHARED ROUTE</button>
+        <button onclick="loadSharedRoute()" style="background:#3498db; color:white;">LOAD LAST ROUTE</button>
+    </div>
+    
+    <div class="row">
+        <button onclick="startSimulation()" class="start-btn" id="driveBtn">START DRIVE</button>
+        <button onclick="resetAll()" class="reset-btn">RESET ALL</button>
+    </div>
+
+    <div style="text-align:center; font-size:14px;">
+        Simulation Speed: <input type="range" id="speed" min="10" max="200" value="60"> <span id="sp">60</span> km/h
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // මැප් එක සෙට් කිරීම (ලංකාවට)
-    var map = L.map('map').setView([6.9271, 79.8612], 13);
-
-    // මැප් එකේ ලේයර් එක (OpenStreetMap)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+    var map = L.map('map').setView([6.9271, 79.8612], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     var routePoints = [];
-    var routeLine = L.polyline([], {color: '#2ecc71', weight: 5}).addTo(map);
+    var polyline = L.polyline([], {color: '#2ecc71', weight: 5}).addTo(map);
+    var carMarker = L.circleMarker([0,0], {radius: 8, color: '#e74c3c', fillOpacity: 1}); // ගමන් කරන වාහනය
+    var isDriving = false;
 
-    // අතුරු පාරවල් දිගේ ක්ලික් කරලා පාර ඇඳීම
-    map.on('click', function(e) {
-        var lat = e.latlng.lat;
-        var lon = e.latlng.lng;
-        routePoints.push([lat, lon]);
-        routeLine.addLatLng([lat, lon]);
-        L.circleMarker([lat, lon], {radius: 5, color: '#f1c40f', fillOpacity: 1}).addTo(map);
+    // Current Location පෙන්වීම
+    map.locate({setView: true, maxZoom: 15});
+    map.on('locationfound', function(e) {
+        L.circle(e.latlng, {radius: 15, color: '#3498db'}).addTo(map).bindPopup("You are here").openPopup();
     });
 
-    function startNav() {
-        if(routePoints.length < 2) {
-            alert("කරුණාකර පාරක් අඳින්න!");
-            return;
+    // මැප් එකේ පාරක් අඳින්න
+    map.on('click', function(e) {
+        if(isDriving) return;
+        routePoints.push([e.latlng.lat, e.latlng.lng]);
+        polyline.addLatLng(e.latlng);
+        L.circleMarker(e.latlng, {radius: 3, color: 'white'}).addTo(map);
+        document.getElementById('statusBox').innerText = "Points Added: " + routePoints.length;
+    });
+
+    // 1. වාහනය පාර දිගේ ගමන් කරන function එක
+    function startSimulation() {
+        if(routePoints.length < 2) return alert("කරුණාකර පාරක් අඳින්න!");
+        if(isDriving) return;
+
+        isDriving = true;
+        carMarker.addTo(map);
+        let i = 0;
+        let speed = 210 - document.getElementById('speed').value; // Speed control
+
+        function move() {
+            if (i < routePoints.length) {
+                carMarker.setLatLng(routePoints[i]);
+                map.panTo(routePoints[i]); // වාහනය පස්සෙන් මැප් එක යනවා
+                
+                // මේ කොටස තමයි ESP32 එකට data යවන්නේ
+                console.log("Sending to ESP32: " + routePoints[i]); 
+                
+                i++;
+                setTimeout(move, speed);
+            } else {
+                isDriving = false;
+                document.getElementById('statusBox').innerText = "Destination Reached!";
+            }
         }
-        console.log("Route Data for ESP32:", JSON.stringify(routePoints));
-        alert("පාර සාර්ථකයි! දැන් ESP32 එක හරහා දත්ත යැවීමට සූදානම්.");
+        move();
     }
 
-    function resetMap() {
-        location.reload();
+    // 2. Shared Route saving (Browser memory එකේ දැනට සේව් වෙන්නේ)
+    function saveSharedRoute() {
+        if(routePoints.length < 2) return;
+        localStorage.setItem('shared_fleet_route', JSON.stringify(routePoints));
+        alert("Route saved for all 15 vehicles!");
     }
 
-    document.getElementById('speed').oninput = function() {
-        document.getElementById('speedDisplay').innerText = this.value;
+    function loadSharedRoute() {
+        let saved = localStorage.getItem('shared_fleet_route');
+        if(!saved) return alert("No saved routes found!");
+        
+        routePoints = JSON.parse(saved);
+        polyline.setLatLngs(routePoints);
+        document.getElementById('statusBox').innerText = "Shared Route Loaded!";
+        
+        // පාරේ තිත් ටික මැප් එකේ පෙන්වන්න
+        routePoints.forEach(p => L.circleMarker(p, {radius: 2, color: 'gray'}).addTo(map));
+    }
+
+    function resetAll() { location.reload(); }
+
+    document.getElementById('speed').oninput = function() { 
+        document.getElementById('sp').innerText = this.value; 
     };
 </script>
-
 </body>
 </html>
