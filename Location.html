@@ -3,43 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Fleet Pro v2</title>
+    <title>Ghost Fleet Pro - Advanced</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; }
+        body { margin: 0; font-family: sans-serif; background: #121212; color: white; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 60vh; width: 100%; }
-        .panel { padding: 15px; background: #1f1f1f; border-radius: 20px 20px 0 0; margin-top: -20px; position: relative; z-index: 1000; }
-        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: none; }
-        input { background: #333; color: white; box-sizing: border-box; }
-        button { font-weight: bold; cursor: pointer; }
-        .btn-reg { background: #27ae60; color: white; }
-        .btn-start { background: #3498db; color: white; }
-        .stats { display: flex; justify-content: space-around; font-size: 14px; margin: 10px 0; color: #2ecc71; }
-        #address-list { font-size: 11px; color: #aaa; max-height: 50px; overflow-y: auto; }
+        #map { height: 50vh; width: 100%; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 20px 20px 0 0; margin-top: -15px; position: relative; z-index: 1000; }
+        input, button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: none; box-sizing: border-box; }
+        input { background: #333; color: white; }
+        .btn-reg { background: #27ae60; color: white; font-weight: bold; }
+        .log { font-size: 11px; background: #000; padding: 10px; height: 80px; overflow-y: scroll; color: #2ecc71; border-radius: 5px; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: #f1c40f; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <h2>Vehicle Registration</h2>
-    <input type="text" id="userName" placeholder="Your Name (e.g. Kamal)">
-    <input type="text" id="vNumber" placeholder="Vehicle Number (e.g. WP-CAD 1234)">
-    <button class="btn-reg" onclick="register()">Join Fleet</button>
+    <h2>Vehicle Register</h2>
+    <input type="text" id="uName" placeholder="Driver ID (e.g. A, B, C)">
+    <input type="text" id="vNo" placeholder="Vehicle No">
+    <button class="btn-reg" onclick="startApp()">REGISTER & LIVE START</button>
 </div>
 
 <div id="map"></div>
 <div class="panel">
-    <div id="userInfo" style="text-align:center; font-weight:bold; margin-bottom:10px;"></div>
     <div class="stats">
-        <span>Distance: <b id="km">0.00</b> KM</span>
-        <span>Status: <b id="mode">Real-Time</b></span>
+        <span>ID: <span id="displayID">-</span></span>
+        <span>Distance: <span id="dist">0</span> km</span>
     </div>
-    <div id="address-list">Route: No points selected</div>
-    
+    <div class="log" id="locationList">Route Addresses: <br></div>
     <div style="display:flex; gap:10px; margin-top:10px;">
-        <button class="btn-start" onclick="startSim()">START GHOST DRIVE</button>
-        <button style="background:#c0392b; color:white;" onclick="location.reload()">RESET</button>
+        <button onclick="startGhostDrive()" style="background:#3498db; color:white; flex:1;">GHOST DRIVE</button>
+        <button onclick="saveRoute()" style="background:#f39c12; color:white; flex:1;">SAVE ROUTE</button>
     </div>
 </div>
 
@@ -48,75 +44,72 @@
     let map = L.map('map').setView([6.9271, 79.8612], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    let userLabel = "", vNo = "";
-    let routePoints = [];
-    let polyline = L.polyline([], {color: '#f1c40f', weight: 4}).addTo(map);
-    let myMarker;
-    let totalKm = 0;
+    let myMarker, myID, vNum;
+    let routeCoords = [];
+    let routeLine = L.polyline([], {color: '#2ecc71', weight: 5}).addTo(map);
 
-    function register() {
-        userLabel = document.getElementById('userName').value;
-        vNo = document.getElementById('vNumber').value;
-        if(!userLabel || !vNo) return alert("Fill details!");
+    function startApp() {
+        myID = document.getElementById('uName').value.toUpperCase();
+        vNum = document.getElementById('vNo').value;
+        if(!myID) return alert("Please enter Driver ID!");
         
         document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('userInfo').innerText = `${userLabel} (${vNo})`;
-        initLocation();
-    }
-
-    function initLocation() {
+        document.getElementById('displayID').innerText = myID;
+        
+        // Real-time Location සොයා ගැනීම
         map.locate({setView: true, watch: true, enableHighAccuracy: true});
-        map.on('locationfound', function(e) {
+        map.on('locationfound', (e) => {
             if(!myMarker) {
-                myMarker = L.marker(e.latlng).addTo(map).bindTooltip(userLabel, {permanent: true}).openTooltip();
+                myMarker = L.marker(e.latlng).addTo(map).bindTooltip("Vehicle " + myID, {permanent: true});
             } else {
-                // Ghost Mode එකේ නැත්නම් විතරක් ඇත්ත location එකට marker එක ගෙනියනවා
-                if(document.getElementById('mode').innerText === "Real-Time") {
-                    myMarker.setLatLng(e.latlng);
-                }
+                myMarker.setLatLng(e.latlng);
             }
         });
     }
 
+    // පාර දිගේම තිත් ඇඳෙන ලොජික් එක (Road Snapping)
     map.on('click', function(e) {
-        let latlng = e.latlng;
-        routePoints.push(latlng);
-        polyline.addLatLng(latlng);
-        L.circleMarker(latlng, {radius: 4, color: 'white'}).addTo(map);
+        let lastPoint = routeCoords.length > 0 ? routeCoords[routeCoords.length - 1] : myMarker.getLatLng();
+        let newPoint = e.latlng;
 
-        // Distance Calculate කිරීම
-        if(routePoints.length > 1) {
-            let last = routePoints[routePoints.length - 2];
-            totalKm += (latlng.distanceTo(last) / 1000);
-            document.getElementById('km').innerText = totalKm.toFixed(2);
-        }
-
-        // Location Name එකක් ලබාගැනීම (Reverse Geocoding)
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
+        // OSRM API එක පාවිච්චි කරලා පාර දිගේ රූට් එක ගන්නවා
+        fetch(`https://router.project-osrm.org/route/v1/driving/${lastPoint.lng},${lastPoint.lat};${newPoint.lng},${newPoint.lat}?overview=full&geometries=geojson`)
         .then(res => res.json())
         .then(data => {
-            let addr = data.display_name.split(',')[0];
-            document.getElementById('address-list').innerHTML += ` > ${addr}`;
+            let coords = data.routes[0].geometry.coordinates;
+            coords.forEach(c => {
+                let p = [c[1], c[0]];
+                routeCoords.push(p);
+                routeLine.addLatLng(p);
+            });
+            
+            // පාරේ නම ලබාගැනීම
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newPoint.lat}&lon=${newPoint.lng}`)
+            .then(r => r.json())
+            .then(d => {
+                let name = d.address.road || d.address.suburb || "Unknown Road";
+                document.getElementById('locationList').innerHTML += `> ${name}<br>`;
+            });
+
+            // දුර ගණනය කිරීම
+            let d = (data.routes[0].distance / 1000).toFixed(2);
+            document.getElementById('dist').innerText = (parseFloat(document.getElementById('dist').innerText) + parseFloat(d)).toFixed(2);
         });
     });
 
-    function startSim() {
-        if(routePoints.length < 2) return alert("අතුරු පාරවල් ඇඳලා ඉන්න!");
-        document.getElementById('mode').innerText = "GHOST MODE";
+    function startGhostDrive() {
+        if(routeCoords.length === 0) return alert("Draw a route first!");
         let i = 0;
-
-        function drive() {
-            if(i < routePoints.length) {
-                myMarker.setLatLng(routePoints[i]);
-                map.panTo(routePoints[i]);
-                // මෙතනදී ESP32 එකට බ්ලූටූත් හරහා signal එක යවන්න ඕනේ
+        function move() {
+            if(i < routeCoords.length) {
+                myMarker.setLatLng(routeCoords[i]);
+                // ESP32 එකට Bluetooth/WiFi හරහා data යැවීම මෙතනදී වෙන්න ඕනේ
+                console.log(`Vehicle ${myID} moving to: ${routeCoords[i]}`);
                 i++;
-                setTimeout(drive, 1000);
-            } else {
-                document.getElementById('mode').innerText = "Real-Time";
+                setTimeout(move, 500); // Speed එක පාලනය
             }
         }
-        drive();
+        move();
     }
 </script>
 </body>
