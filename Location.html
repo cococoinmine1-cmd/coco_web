@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Speed Control</title>
+    <title>Ghost Driver - Firebase Global</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
@@ -14,21 +16,20 @@
         input { background: #333; color: white; }
         .btn-main { background: #27ae60; color: white; font-weight: bold; }
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
-        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 100px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; }
-        .del-btn { background: #c0392b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
-        #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; line-height: 1.4; }
+        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 120px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; }
+        .del-btn { background: #c0392b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
+        #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
         .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; margin-right: 5px; }
-        .speed-tag { color: #e74c3c; font-size: 10px; font-weight: normal; }
+        .speed-tag { color: #e74c3c; font-size: 11px; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <h1 style="color: #27ae60;">Ghost Driver</h1>
-    <p style="font-size: 12px; color: #888;">ඔබේ නම හෝ වාහනයේ අංකය ඇතුළත් කරන්න</p>
-    <input type="text" id="uID" placeholder="Driver Name / ID (e.g. AMILA)">
-    <button class="btn-main" onclick="saveUser()">REGISTER & START</button>
+    <input type="text" id="uID" placeholder="Enter Your Name (e.g. AMILA)">
+    <button class="btn-main" onclick="saveUser()">REGISTER & JOIN NETWORK</button>
 </div>
 
 <div id="map"></div>
@@ -40,7 +41,6 @@
     </div>
     
     <div id="townList">පාර අඳින්න... ගම්වල නම් මෙතන වැටේවි.</div>
-
     <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න">
     
     <div style="display:flex; gap:5px;">
@@ -50,20 +50,30 @@
     </div>
 
     <div class="history-panel">
-        <div style="font-size: 10px; color: #777; margin-bottom: 5px;">SHARED ROUTES & HISTORY:</div>
-        <div id="historyList"></div>
+        <div style="font-size: 10px; color: #777; margin-bottom: 5px;">GLOBAL NETWORK ROUTES:</div>
+        <div id="historyList">Loading shared data...</div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // --- පල්ලෙහා තියෙන විස්තර ඔයාගේ Firebase එකෙන් අරන් දාන්න ---
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
     let map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    let driverID, realMarker, ghostMarker, routePoints = [], totalKm = 0, isGhosting = false;
-    let otherDrivers = {}; 
-    let polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
-    let townNames = [];
+    let driverID, realMarker, ghostMarker, routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
+    let otherDrivers = {};
 
     window.onload = function() {
         let saved = localStorage.getItem('driver_letter');
@@ -72,14 +82,13 @@
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('dispID').innerText = driverID;
             initGPS();
-            loadHistory();
-            startNetworkUpdate();
+            listenToNetwork();
         }
     };
 
     function saveUser() {
-        let id = document.getElementById('uID').value.toUpperCase();
-        if(!id) return alert("කරුණාකර නමක් ඇතුළත් කරන්න!");
+        let id = document.getElementById('uID').value.toUpperCase().trim();
+        if(!id) return alert("නමක් ඇතුළත් කරන්න!");
         localStorage.setItem('driver_letter', id);
         location.reload();
     }
@@ -87,44 +96,60 @@
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
-        map.locate({setView: true, maxZoom: 15});
+        map.locate({setView: true, watch: true, maxZoom: 15});
         map.on('locationfound', (e) => {
             if(!realMarker) {
                 realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
             }
-            updateNetworkLocation(e.latlng);
+            // සර්වර් එකට ලොකේෂන් එක යැවීම
+            db.ref('fleet/' + driverID).set({lat: e.latlng.lat, lng: e.latlng.lng, time: Date.now()});
         });
     }
 
-    function updateNetworkLocation(latlng) {
-        let fleet = JSON.parse(localStorage.getItem('fleet_positions') || '{}');
-        fleet[driverID] = {lat: latlng.lat, lng: latlng.lng, time: Date.now()};
-        localStorage.setItem('fleet_positions', JSON.stringify(fleet));
-    }
-
-    function startNetworkUpdate() {
-        setInterval(() => {
-            let fleet = JSON.parse(localStorage.getItem('fleet_positions') || '{}');
-            for (let id in fleet) {
+    // සර්වර් එකෙන් අනිත් අයගේ විස්තර ලබාගැනීම
+    function listenToNetwork() {
+        // 1. අනිත් අයගේ සජීවී පිහිටීම (Fleet)
+        db.ref('fleet').on('value', (snapshot) => {
+            const data = snapshot.val();
+            for (let id in data) {
                 if (id !== driverID) {
-                    let pos = fleet[id];
+                    let pos = data[id];
                     if (!otherDrivers[id]) {
                         otherDrivers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'other-car', html: `<b style="color:red; background:white; padding:2px; border:1px solid red; border-radius:3px; font-size:10px;">${id}</b>`})
+                            icon: L.divIcon({className: 'car', html: `<b style="color:red; background:white; padding:2px; border:1px solid red; border-radius:3px; font-size:10px;">${id}</b>`})
                         }).addTo(map);
                     } else {
                         otherDrivers[id].setLatLng([pos.lat, pos.lng]);
                     }
                 }
             }
-        }, 3000);
+        });
+
+        // 2. හැමෝම සේව් කරන රූට් ලිස්ට් එක (Global History)
+        db.ref('shared_routes').on('value', (snapshot) => {
+            const history = [];
+            snapshot.forEach((child) => {
+                history.unshift(child.val());
+            });
+            renderHistory(history);
+        });
+    }
+
+    function renderHistory(history) {
+        document.getElementById('historyList').innerHTML = history.map(r => `
+            <div class="history-item">
+                <span onclick="loadRouteData('${r.id}')" style="cursor:pointer;">
+                    <span class="badge">${r.driver}</span> ${r.name} (${r.km} KM)
+                </span>
+                <button class="del-btn" onclick="deleteFromFirebase('${r.id}')">Delete</button>
+            </div>
+        `).join('');
     }
 
     map.on('click', function(e) {
         if(isGhosting) return;
         let last = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (realMarker ? realMarker.getLatLng() : e.latlng);
-        
         fetch(`https://router.project-osrm.org/route/v1/driving/${last.lng},${last.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
@@ -134,12 +159,12 @@
                 });
                 totalKm += data.routes[0].distance / 1000;
                 document.getElementById('km').innerText = totalKm.toFixed(2);
-                getPlaceName(e.latlng);
+                updateTownNames(e.latlng);
             }
         });
     });
 
-    function getPlaceName(latlng) {
+    function updateTownNames(latlng) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=14`)
         .then(res => res.json()).then(data => {
             let place = data.address.suburb || data.address.town || data.address.village || "Point";
@@ -154,86 +179,51 @@
         let rName = document.getElementById('routeName').value || "Route by " + driverID;
         if(routePoints.length < 2) return alert("පාරක් අඳින්න!");
 
-        saveRouteToNetwork(rName);
-        isGhosting = true;
-        
-        let i = 0;
-        let stepDelay = 150; 
+        let rId = Date.now().toString();
+        db.ref('shared_routes/' + rId).set({
+            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
+        });
 
-        function moveSmoothly() {
+        isGhosting = true;
+        let i = 0;
+        function move() {
             if(i < routePoints.length) {
+                let speed = (i < routePoints.length * 0.1) ? 10 : 25;
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
+                
                 let currentPoint = routePoints[Math.floor(i)];
                 ghostMarker.setLatLng(currentPoint);
                 map.panTo(currentPoint, {animate: true, duration: 0.1});
                 
+                // ESP32 Output
                 console.log(`${driverID}:${currentPoint[0]},${currentPoint[1]}`);
 
-                // Variable Speed Logic:
-                // මුල් 10% දුර 10kmh, ඉතිරි දුර 25kmh
-                let currentSpeed = 0;
-                let stepJump = 0;
-
-                if (i < routePoints.length * 0.1) {
-                    currentSpeed = 10;
-                    stepJump = 0.2; // 10kmh ට ගැලපෙන පියවර
-                } else {
-                    currentSpeed = 25;
-                    stepJump = 0.5; // 25kmh ට ගැලපෙන පියවර
-                }
-
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${currentSpeed} km/h`;
-                
-                i += stepJump;
-                setTimeout(moveSmoothly, stepDelay);
+                i += (speed === 10) ? 0.2 : 0.5;
+                setTimeout(move, 150);
             } else {
                 alert("ගමනාන්තයට පැමිණියා!");
                 isGhosting = false;
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
             }
         }
-        moveSmoothly();
+        move();
     }
 
-    function saveRouteToNetwork(name) {
-        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
-        history.unshift({id: Date.now(), driver: driverID, name: name, km: totalKm.toFixed(2), points: routePoints, towns: townNames});
-        localStorage.setItem('shared_ghost_history', JSON.stringify(history.slice(0,15)));
-        loadHistory();
-    }
-
-    function loadHistory() {
-        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
-        document.getElementById('historyList').innerHTML = history.map(r => `
-            <div class="history-item">
-                <span onclick="loadSelectedRoute(${r.id})" style="cursor:pointer;">
-                    <span class="badge">${r.driver}</span> ${r.name} (${r.km} KM)
-                </span>
-                <button class="del-btn" onclick="deleteRoute(${r.id})">Delete</button>
-            </div>
-        `).join('');
-    }
-
-    window.deleteRoute = function(id) {
-        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
-        let filtered = history.filter(r => r.id !== id);
-        localStorage.setItem('shared_ghost_history', JSON.stringify(filtered));
-        loadHistory();
-    }
-
-    window.loadSelectedRoute = function(id) {
-        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
-        let selected = history.find(r => r.id === id);
-        if(selected) {
+    window.loadRouteData = function(id) {
+        db.ref('shared_routes/' + id).once('value', (snap) => {
+            let selected = snap.val();
             clearRoute();
             routePoints = selected.points;
             polyline.setLatLngs(routePoints);
             totalKm = parseFloat(selected.km);
             document.getElementById('km').innerText = selected.km;
-            document.getElementById('routeName').value = selected.name;
             townNames = selected.towns || [];
             document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
             map.fitBounds(polyline.getBounds());
-        }
+        });
+    }
+
+    window.deleteFromFirebase = function(id) {
+        db.ref('shared_routes/' + id).remove();
     }
 
     function clearRoute() {
@@ -242,5 +232,6 @@
         document.getElementById('townList').innerText = "පාර අඳින්න...";
     }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
