@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Network Active</title>
+    <title>Ghost Driver - Pro Network</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -15,7 +15,7 @@
         .btn-main { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
         .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 120px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; cursor: pointer; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; }
         .del-btn { background: #c0392b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
         #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
         .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; margin-right: 5px; }
@@ -25,6 +25,7 @@
 
 <div id="login-screen">
     <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
+    <p style="color: #888; font-size: 12px; margin-bottom: 15px;">Global Network Active</p>
     <input type="text" id="uID" placeholder="ඔබේ නම ඇතුළත් කරන්න">
     <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
 </div>
@@ -37,18 +38,18 @@
         <span id="currentSpeedDisplay" style="color:#e74c3c;">Speed: 0 km/h</span>
     </div>
     
-    <div id="townList">පාර අඳින්න සිතියම ක්ලික් කරන්න...</div>
+    <div id="townList">පාර අඳින්න...</div>
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
     
     <div style="display:flex; gap:5px;">
         <button class="btn-main" onclick="confirmRoute()">OK (START)</button>
-        <button onclick="reCenter()" style="background:#3498db; color:white; width: 25%; border-radius: 8px;">LOCATE</button>
         <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 25%; border-radius: 8px;">CLEAR</button>
         <button onclick="logout()" style="background:#c0392b; color:white; width: 25%; border-radius: 8px;">EXIT</button>
     </div>
 
     <div class="history-panel">
-        <div id="historyList" style="font-size: 10px; color: #777;">සර්වර් එකට සම්බන්ධ වෙමින්...</div>
+        <div style="font-size: 10px; color: #777; margin-bottom: 5px;">සජීවී ජාලයේ රූට්ස් (Network):</div>
+        <div id="historyList">සම්බන්ධ වෙමින්...</div>
     </div>
 </div>
 
@@ -57,24 +58,27 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-    // --- මෙතනට ඔයාගේ Firebase විස්තර ටික අනිවාර්යයෙන්ම දාන්න ---
+    // --- ඔබේ අලුත් Firebase Configuration එක ---
     const firebaseConfig = {
-        apiKey: "මෙතනට_ඔයාගේ_API_KEY_එක_දාන්න", 
+        apiKey: "YOUR_API_KEY", // <--- මෙතනට ඔබේ API KEY එක දාන්න
         authDomain: "location-38937.firebaseapp.com",
         databaseURL: "https://location-38937-default-rtdb.asia-southeast1.firebasedatabase.app/",
         projectId: "location-38937",
         storageBucket: "location-38937.appspot.com",
-        messagingSenderId: "මෙතනට_SENDER_ID_එක_දාන්න",
-        appId: "මෙතනට_APP_ID_එක_දාන්න"
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    // Firebase Initialize කිරීම
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline;
     let driverID = "";
     let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
-    let otherMarkers = {};
+    let otherDrivers = {};
 
     function initMap() {
         if (map) return;
@@ -106,52 +110,49 @@
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
-        map.locate({setView: false, watch: true, maxZoom: 15});
+        map.locate({setView: true, watch: true, maxZoom: 15});
         map.on('locationfound', (e) => {
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
+                realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db', fillOpacity: 0.8}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
-                map.setView(e.latlng, 15);
             }
+            // Live ලොකේෂන් සර්වර් එකට යැවීම
             db.ref('fleet/' + driverID).update({
-                lat: e.latlng.lat, lng: e.latlng.lng, lastSeen: Date.now()
+                lat: e.latlng.lat,
+                lng: e.latlng.lng,
+                lastSeen: Date.now()
             });
         });
     }
 
-    function reCenter() { if(realMarker) map.setView(realMarker.getLatLng(), 15); }
-
     function listenToNetwork() {
-        // 1. Connection Check
-        db.ref(".info/connected").on("value", (snap) => {
-            if (snap.val() === false) document.getElementById('historyList').innerText = "සම්බන්ධතාවය බිඳී ඇත...";
-        });
-
-        // 2. Fleet (අනිත් අය)
+        // 1. අනිත් අයගේ පිහිටීම බලාගැනීම
         db.ref('fleet').on('value', (snapshot) => {
             const data = snapshot.val();
             if(!data) return;
             Object.keys(data).forEach(id => {
                 if(id !== driverID) {
                     let pos = data[id];
-                    if(!otherMarkers[id]) {
-                        otherMarkers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'car', html: `<div style="background:#e74c3c; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white;">${id}</div>`})
+                    if(!otherDrivers[id]) {
+                        otherDrivers[id] = L.marker([pos.lat, pos.lng], {
+                            icon: L.divIcon({className: 'car', html: `<div style="background:#e74c3c; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; width:max-content; border:1px solid white;">${id}</div>`})
                         }).addTo(map);
                     } else {
-                        otherMarkers[id].setLatLng([pos.lat, pos.lng]);
+                        otherDrivers[id].setLatLng([pos.lat, pos.lng]);
                     }
                 }
             });
         });
 
-        // 3. Routes List
+        // 2. සේව් කරපු රූට්ස් ලිස්ට් එක ගැනීම
         db.ref('shared_routes').on('value', (snapshot) => {
             const history = [];
-            snapshot.forEach((child) => history.unshift(child.val()));
+            snapshot.forEach((child) => {
+                history.unshift(child.val());
+            });
             renderHistory(history);
-        }, (err) => {
-            document.getElementById('historyList').innerText = "Permission Error: Rules චෙක් කරන්න.";
+        }, (error) => {
+            document.getElementById('historyList').innerHTML = "<div style='color:red;'>Permission Error! Check Firebase Rules.</div>";
         });
     }
 
@@ -163,7 +164,7 @@
         }
         listDiv.innerHTML = history.map(r => `
             <div class="history-item" onclick="loadRouteData('${r.id}')">
-                <span><span class="badge">${r.driver}</span> ${r.name} (${r.km} km)</span>
+                <span style="flex-grow:1;"><span class="badge">${r.driver}</span> ${r.name} (${r.km} km)</span>
                 <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>
             </div>
         `).join('');
@@ -197,54 +198,69 @@
         });
     }
 
+    // --- රූට් එක පටන් ගැනීම සහ වේගය පාලනය ---
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("පාරක් අඳින්න!");
+        if(routePoints.length < 2) return alert("කරුණාකර පාරක් අඳින්න!");
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
         
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
-        }).then(() => {
-            isGhosting = true;
-            let i = 0;
-            function move() {
-                if(i < routePoints.length) {
-                    let speed = (i < routePoints.length * 0.1) ? 10 : 25;
-                    document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
-                    let currentPoint = routePoints[Math.floor(i)];
-                    ghostMarker.setLatLng(currentPoint);
-                    map.panTo(currentPoint);
-                    i += (speed === 10) ? 0.3 : 0.7; 
-                    setTimeout(move, 150);
-                } else {
-                    isGhosting = false;
-                    document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
-                }
+        });
+
+        isGhosting = true;
+        let i = 0;
+        function move() {
+            if(i < routePoints.length) {
+                // වේගය තවත් අඩු කර ඇත:
+                // මුල් 10% දුර 5km/h, ඉතිරි දුර 15km/h
+                let speed = (i < routePoints.length * 0.1) ? 5 : 15;
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
+                
+                let currentPoint = routePoints[Math.floor(i)];
+                ghostMarker.setLatLng(currentPoint);
+                map.panTo(currentPoint, {animate: true, duration: 0.2});
+                
+                // ඊළඟ පොයින්ට් එකට යන ප්‍රමාණය (Step size)
+                i += (speed === 5) ? 0.1 : 0.3; 
+                setTimeout(move, 200); // 0.2s ක ප්‍රමදයක් (Smoothness වැඩි කිරීමට)
+            } else {
+                isGhosting = false;
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
+                alert("ගමනාන්තයට පැමිණියා!");
             }
-            move();
-        }).catch(e => alert("Error: Rules Check කරන්න! " + e.message));
+        }
+        move();
     }
 
     window.loadRouteData = function(id) {
         db.ref('shared_routes/' + id).once('value', (snap) => {
-            let s = snap.val(); if(!s) return;
+            let selected = snap.val();
+            if(!selected) return;
             clearRoute();
-            routePoints = s.points;
+            routePoints = selected.points;
             polyline.setLatLngs(routePoints);
-            totalKm = parseFloat(s.km);
-            document.getElementById('km').innerText = s.km;
-            townNames = s.towns || [];
+            totalKm = parseFloat(selected.km);
+            document.getElementById('km').innerText = selected.km;
+            townNames = selected.towns || [];
             document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
             map.fitBounds(polyline.getBounds());
         });
     }
 
-    window.deleteRoute = function(id) { if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
+    window.deleteRoute = function(id) {
+        if(confirm("මෙම රූට් එක මකා දැමීමට අවශ්‍යද?")) {
+            db.ref('shared_routes/' + id).remove();
+        }
+    }
 
     function clearRoute() {
-        routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
+        routePoints = []; 
+        if(polyline) polyline.setLatLngs([]); 
+        totalKm = 0; 
+        townNames = [];
         document.getElementById('km').innerText = "0.00";
-        document.getElementById('townList').innerText = "සිතියම ක්ලික් කරන්න...";
+        document.getElementById('townList').innerText = "පාර අඳින්න...";
     }
 </script>
 </body>
