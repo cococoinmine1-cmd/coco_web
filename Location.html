@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - 30kmh Smooth</title>
+    <title>Ghost Driver - Pro Speed Control</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 50vh; width: 100%; }
+        #map { height: 48vh; width: 100%; }
         .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
         input, button { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
         input { background: #333; color: white; }
@@ -19,14 +19,16 @@
         .del-btn { background: #c0392b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
         #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; line-height: 1.4; }
         .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; margin-right: 5px; }
+        .speed-tag { color: #e74c3c; font-size: 10px; font-weight: normal; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <h1 style="color: #27ae60;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="Driver ID (A, B, C...)">
-    <button class="btn-main" onclick="saveUser()">REGISTER</button>
+    <p style="font-size: 12px; color: #888;">ඔබේ නම හෝ වාහනයේ අංකය ඇතුළත් කරන්න</p>
+    <input type="text" id="uID" placeholder="Driver Name / ID (e.g. AMILA)">
+    <button class="btn-main" onclick="saveUser()">REGISTER & START</button>
 </div>
 
 <div id="map"></div>
@@ -34,7 +36,7 @@
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
-        <span style="color:#e74c3c;">Speed: 30 km/h</span>
+        <span id="currentSpeedDisplay" class="speed-tag">Speed: 0 km/h</span>
     </div>
     
     <div id="townList">පාර අඳින්න... ගම්වල නම් මෙතන වැටේවි.</div>
@@ -77,7 +79,7 @@
 
     function saveUser() {
         let id = document.getElementById('uID').value.toUpperCase();
-        if(!id) return;
+        if(!id) return alert("කරුණාකර නමක් ඇතුළත් කරන්න!");
         localStorage.setItem('driver_letter', id);
         location.reload();
     }
@@ -137,11 +139,10 @@
         });
     });
 
-    // ගම්වල නම් හරියටම ගන්න විදිහ
     function getPlaceName(latlng) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=14`)
         .then(res => res.json()).then(data => {
-            let place = data.address.suburb || data.address.town || data.address.village || data.address.neighbourhood || "Point";
+            let place = data.address.suburb || data.address.town || data.address.village || "Point";
             if(!townNames.includes(place)) {
                 townNames.push(place);
                 document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
@@ -157,29 +158,37 @@
         isGhosting = true;
         
         let i = 0;
-        let speedKmH = 30; // 30 km/h fixed speed
-        let stepDelay = 100; // 100ms update rate for very smooth motion
-        
-        // ගණිතමය වශයෙන් වේගය තීරණය කිරීම
-        // 30 km/h = 8.33 meters per second
-        // 0.1 second (stepDelay) එකකදී යා යුතු දුර = 0.833 meters
-        
+        let stepDelay = 150; 
+
         function moveSmoothly() {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
                 ghostMarker.setLatLng(currentPoint);
                 map.panTo(currentPoint, {animate: true, duration: 0.1});
                 
-                // ESP32 Console Output
                 console.log(`${driverID}:${currentPoint[0]},${currentPoint[1]}`);
 
-                // 30kmh ට ගැලපෙන විදිහට පියවරවල් පැනීම (Dynamic stepping)
-                i += 0.5; // මේක 30km/h වේගයට ලඟා වෙන්න දාපු අගයක්
+                // Variable Speed Logic:
+                // මුල් 10% දුර 10kmh, ඉතිරි දුර 25kmh
+                let currentSpeed = 0;
+                let stepJump = 0;
+
+                if (i < routePoints.length * 0.1) {
+                    currentSpeed = 10;
+                    stepJump = 0.2; // 10kmh ට ගැලපෙන පියවර
+                } else {
+                    currentSpeed = 25;
+                    stepJump = 0.5; // 25kmh ට ගැලපෙන පියවර
+                }
+
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${currentSpeed} km/h`;
                 
+                i += stepJump;
                 setTimeout(moveSmoothly, stepDelay);
             } else {
                 alert("ගමනාන්තයට පැමිණියා!");
                 isGhosting = false;
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
             }
         }
         moveSmoothly();
