@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Control</title>
+    <title>Ghost Driver - Smooth Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -16,7 +16,7 @@
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
         .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 80px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
         .history-item { padding: 6px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; cursor: pointer; }
-        #townList { font-size: 10px; color: #aaa; height: 30px; overflow: hidden; font-style: italic; }
+        #townList { font-size: 10px; color: #aaa; height: 30px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     </style>
 </head>
 <body>
@@ -34,10 +34,10 @@
         <span>KM: <span id="km">0.00</span></span>
     </div>
     
-    <div id="townList">Passing through: Select points...</div>
+    <div id="townList">Passing: Select points on map...</div>
 
-    <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න (e.g. Town to Home)">
-    <input type="number" id="targetTime" placeholder="කාලය (විනාඩි වලින්)">
+    <input type="text" id="routeName" placeholder="Route Name (e.g. Home to Shop)">
+    <input type="number" id="targetTime" placeholder="Total Time (Minutes)">
     
     <div style="display:flex; gap:5px;">
         <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (START)</button>
@@ -52,7 +52,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map = L.map('map').setView([6.9271, 79.8612], 13);
+    let map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let driverID, realMarker, ghostMarker, routePoints = [], totalKm = 0, isGhosting = false;
@@ -109,7 +109,7 @@
     function getPlaceName(latlng) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
         .then(res => res.json()).then(data => {
-            let place = data.address.suburb || data.address.town || data.address.village || "Unknown";
+            let place = data.address.suburb || data.address.town || data.address.village || "Point Added";
             document.getElementById('townList').innerText += " > " + place;
         });
     }
@@ -117,29 +117,35 @@
     function confirmRoute() {
         let mins = document.getElementById('targetTime').value;
         let rName = document.getElementById('routeName').value || "Unnamed Route";
-        if(routePoints.length < 2 || !mins) return alert("පාර සහ කාලය ඇතුළත් කරන්න!");
+        if(routePoints.length < 2 || !mins) return alert("Select route and Time!");
 
         saveRouteData(rName);
         isGhosting = true;
         
         let i = 0;
-        let totalSteps = routePoints.length;
-        let duration = mins * 60 * 1000;
-        let stepTime = duration / totalSteps;
+        let totalDuration = mins * 60 * 1000;
+        let stepDelay = 50; // Milliseconds for smooth animation
+        let totalSteps = totalDuration / stepDelay;
+        let pointsPerStep = routePoints.length / totalSteps;
 
-        function moveSmoothly() {
-            if(i < routePoints.length) {
-                ghostMarker.setLatLng(routePoints[i]);
-                map.panTo(routePoints[i]);
-                console.log(`${driverID}:${routePoints[i][0]},${routePoints[i][1]}`);
-                i++;
-                setTimeout(moveSmoothly, stepTime);
+        function animate() {
+            if(i < routePoints.length - 1) {
+                let currentPoint = routePoints[Math.floor(i)];
+                ghostMarker.setLatLng(currentPoint);
+                map.panTo(currentPoint, {animate: true, duration: 0.05});
+
+                // ESP32 Output
+                console.log(`${driverID}:${currentPoint[0]},${currentPoint[1]}`);
+                
+                i += pointsPerStep;
+                setTimeout(animate, stepDelay);
             } else {
+                ghostMarker.setLatLng(routePoints[routePoints.length - 1]);
                 alert("Destination Reached!");
                 isGhosting = false;
             }
         }
-        moveSmoothly();
+        animate();
     }
 
     function saveRouteData(name) {
@@ -173,7 +179,7 @@
     function clearRoute() {
         routePoints = []; polyline.setLatLngs([]); totalKm = 0;
         document.getElementById('km').innerText = "0.00";
-        document.getElementById('townList').innerText = "Passing through: ";
+        document.getElementById('townList').innerText = "Passing: ";
     }
 </script>
 </body>
