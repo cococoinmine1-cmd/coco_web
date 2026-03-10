@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Smooth</title>
+    <title>Ghost Driver - Network Smooth</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -14,9 +14,11 @@
         input { background: #333; color: white; }
         .btn-main { background: #27ae60; color: white; font-weight: bold; }
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
-        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 80px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
-        .history-item { padding: 6px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; cursor: pointer; }
-        #townList { font-size: 10px; color: #aaa; height: 30px; overflow: hidden; font-style: italic; }
+        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 100px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; }
+        .del-btn { background: #c0392b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
+        #townList { font-size: 10px; color: #aaa; height: 25px; overflow: hidden; font-style: italic; }
+        .badge { background: #f39c12; color: black; padding: 2px 5px; border-radius: 4px; font-size: 9px; margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -34,10 +36,10 @@
         <span>KM: <span id="km">0.00</span></span>
     </div>
     
-    <div id="townList">Passing through: Select points...</div>
+    <div id="townList">Passing: Select points...</div>
 
-    <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න (e.g. Town to Home)">
-    <input type="number" id="targetTime" placeholder="කාලය (විනාඩි වලින්)">
+    <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න">
+    <input type="number" id="targetTime" placeholder="කාලය (විනාඩි)">
     
     <div style="display:flex; gap:5px;">
         <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (START)</button>
@@ -45,17 +47,19 @@
         <button onclick="logout()" style="background:#c0392b; color:white; width: 25%;">EXIT</button>
     </div>
 
-    <div class="history-panel" id="historyBox">
+    <div class="history-panel">
+        <div style="font-size: 10px; color: #777; margin-bottom: 5px;">NETWORK SHARED ROUTES:</div>
         <div id="historyList"></div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    let map = L.map('map').setView([6.9271, 79.8612], 13);
+    let map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let driverID, realMarker, ghostMarker, routePoints = [], totalKm = 0, isGhosting = false;
+    let otherDrivers = {}; // අනිත් අයගේ මාකර්ස් තියාගන්න
     let polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
 
     window.onload = function() {
@@ -66,6 +70,7 @@
             document.getElementById('dispID').innerText = driverID;
             initGPS();
             loadHistory();
+            startNetworkUpdate(); // අනිත් අයව අප්ඩේට් කරන්න පටන් ගන්න
         }
     };
 
@@ -85,7 +90,34 @@
                 realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
             }
+            // උඹ ඉන්න තැන නෙට්වර්ක් එකට යවන්න
+            updateNetworkLocation(e.latlng);
         });
+    }
+
+    // අනිත් අයගේ ලොකේෂන් පෙන්වීම (Mocking Network)
+    function updateNetworkLocation(latlng) {
+        let fleet = JSON.parse(localStorage.getItem('fleet_positions') || '{}');
+        fleet[driverID] = {lat: latlng.lat, lng: latlng.lng, time: Date.now()};
+        localStorage.setItem('fleet_positions', JSON.stringify(fleet));
+    }
+
+    function startNetworkUpdate() {
+        setInterval(() => {
+            let fleet = JSON.parse(localStorage.getItem('fleet_positions') || '{}');
+            for (let id in fleet) {
+                if (id !== driverID) {
+                    let pos = fleet[id];
+                    if (!otherDrivers[id]) {
+                        otherDrivers[id] = L.marker([pos.lat, pos.lng], {
+                            icon: L.divIcon({className: 'other-car', html: `<b style="color:red; background:white; padding:2px; border-radius:3px;">${id}</b>`})
+                        }).addTo(map);
+                    } else {
+                        otherDrivers[id].setLatLng([pos.lat, pos.lng]);
+                    }
+                }
+            }
+        }, 3000);
     }
 
     map.on('click', function(e) {
@@ -109,41 +141,35 @@
     function getPlaceName(latlng) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
         .then(res => res.json()).then(data => {
-            let place = data.address.suburb || data.address.town || data.address.village || "Unknown";
+            let place = data.address.suburb || data.address.town || "Point";
             document.getElementById('townList').innerText += " > " + place;
         });
     }
 
     function confirmRoute() {
         let mins = document.getElementById('targetTime').value;
-        let rName = document.getElementById('routeName').value || "Unnamed Route";
+        let rName = document.getElementById('routeName').value || "Route by " + driverID;
         if(routePoints.length < 2 || !mins) return alert("පාර සහ කාලය ඇතුළත් කරන්න!");
 
-        saveRouteData(rName);
+        saveRouteToNetwork(rName);
         isGhosting = true;
         
         let i = 0;
         let totalDuration = mins * 60 * 1000;
-        let stepDelay = 50; // Milliseconds for smooth movement
-        let totalSteps = totalDuration / stepDelay;
-        let pointsPerStep = routePoints.length / totalSteps;
+        let stepDelay = 60; 
+        let pointsPerStep = routePoints.length / (totalDuration / stepDelay);
 
         function moveSmoothly() {
             if(i < routePoints.length) {
-                let currentIndex = Math.floor(i);
-                let currentPoint = routePoints[currentIndex];
-                
+                let currentPoint = routePoints[Math.floor(i)];
                 ghostMarker.setLatLng(currentPoint);
                 map.panTo(currentPoint, {animate: true, duration: 0.1});
                 
-                // ESP32 Console Output
+                // ESP32 Output
                 console.log(`${driverID}:${currentPoint[0]},${currentPoint[1]}`);
-                
                 i += pointsPerStep;
                 setTimeout(moveSmoothly, stepDelay);
             } else {
-                // Ensure it hits the exact last point
-                ghostMarker.setLatLng(routePoints[routePoints.length - 1]);
                 alert("Destination Reached!");
                 isGhosting = false;
             }
@@ -151,22 +177,35 @@
         moveSmoothly();
     }
 
-    function saveRouteData(name) {
-        let history = JSON.parse(localStorage.getItem('ghost_history') || '[]');
-        history.unshift({id: Date.now(), name: name, km: totalKm.toFixed(2), points: routePoints});
-        localStorage.setItem('ghost_history', JSON.stringify(history.slice(0,10)));
+    // සේව් කරන රූට් එක නෙට්වර්ක් එකට (Shared Memory) දානවා
+    function saveRouteToNetwork(name) {
+        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
+        history.unshift({id: Date.now(), driver: driverID, name: name, km: totalKm.toFixed(2), points: routePoints});
+        localStorage.setItem('shared_ghost_history', JSON.stringify(history.slice(0,15)));
         loadHistory();
     }
 
     function loadHistory() {
-        let history = JSON.parse(localStorage.getItem('ghost_history') || '[]');
-        document.getElementById('historyList').innerHTML = history.map(r => 
-            `<div class="history-item" onclick="loadSelectedRoute(${r.id})">${r.name} (${r.km} KM)</div>`
-        ).join('');
+        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
+        document.getElementById('historyList').innerHTML = history.map(r => `
+            <div class="history-item">
+                <span onclick="loadSelectedRoute(${r.id})" style="cursor:pointer;">
+                    <span class="badge">${r.driver}</span> ${r.name} (${r.km} KM)
+                </span>
+                <button class="del-btn" onclick="deleteRoute(${r.id})">Delete</button>
+            </div>
+        `).join('');
+    }
+
+    window.deleteRoute = function(id) {
+        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
+        let filtered = history.filter(r => r.id !== id);
+        localStorage.setItem('shared_ghost_history', JSON.stringify(filtered));
+        loadHistory();
     }
 
     window.loadSelectedRoute = function(id) {
-        let history = JSON.parse(localStorage.getItem('ghost_history') || '[]');
+        let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
         let selected = history.find(r => r.id === id);
         if(selected) {
             clearRoute();
