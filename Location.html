@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Network Smooth</title>
+    <title>Ghost Driver - 30kmh Smooth</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 45vh; width: 100%; }
+        #map { height: 50vh; width: 100%; }
         .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
         input, button { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
         input { background: #333; color: white; }
@@ -17,15 +17,15 @@
         .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 100px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
         .history-item { display: flex; justify-content: space-between; align-items: center; padding: 6px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; }
         .del-btn { background: #c0392b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
-        #townList { font-size: 10px; color: #aaa; height: 25px; overflow: hidden; font-style: italic; }
-        .badge { background: #f39c12; color: black; padding: 2px 5px; border-radius: 4px; font-size: 9px; margin-right: 5px; }
+        #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; line-height: 1.4; }
+        .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; margin-right: 5px; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <h1 style="color: #27ae60;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="Driver ID (e.g. A)">
+    <input type="text" id="uID" placeholder="Driver ID (A, B, C...)">
     <button class="btn-main" onclick="saveUser()">REGISTER</button>
 </div>
 
@@ -34,12 +34,12 @@
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
+        <span style="color:#e74c3c;">Speed: 30 km/h</span>
     </div>
     
-    <div id="townList">Passing: Select points...</div>
+    <div id="townList">පාර අඳින්න... ගම්වල නම් මෙතන වැටේවි.</div>
 
     <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න">
-    <input type="number" id="targetTime" placeholder="කාලය (විනාඩි)">
     
     <div style="display:flex; gap:5px;">
         <button class="btn-main" id="okBtn" onclick="confirmRoute()">OK (START)</button>
@@ -48,7 +48,7 @@
     </div>
 
     <div class="history-panel">
-        <div style="font-size: 10px; color: #777; margin-bottom: 5px;">NETWORK SHARED ROUTES:</div>
+        <div style="font-size: 10px; color: #777; margin-bottom: 5px;">SHARED ROUTES & HISTORY:</div>
         <div id="historyList"></div>
     </div>
 </div>
@@ -59,8 +59,9 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
     let driverID, realMarker, ghostMarker, routePoints = [], totalKm = 0, isGhosting = false;
-    let otherDrivers = {}; // අනිත් අයගේ මාකර්ස් තියාගන්න
+    let otherDrivers = {}; 
     let polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
+    let townNames = [];
 
     window.onload = function() {
         let saved = localStorage.getItem('driver_letter');
@@ -70,7 +71,7 @@
             document.getElementById('dispID').innerText = driverID;
             initGPS();
             loadHistory();
-            startNetworkUpdate(); // අනිත් අයව අප්ඩේට් කරන්න පටන් ගන්න
+            startNetworkUpdate();
         }
     };
 
@@ -90,12 +91,10 @@
                 realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
             }
-            // උඹ ඉන්න තැන නෙට්වර්ක් එකට යවන්න
             updateNetworkLocation(e.latlng);
         });
     }
 
-    // අනිත් අයගේ ලොකේෂන් පෙන්වීම (Mocking Network)
     function updateNetworkLocation(latlng) {
         let fleet = JSON.parse(localStorage.getItem('fleet_positions') || '{}');
         fleet[driverID] = {lat: latlng.lat, lng: latlng.lng, time: Date.now()};
@@ -110,7 +109,7 @@
                     let pos = fleet[id];
                     if (!otherDrivers[id]) {
                         otherDrivers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'other-car', html: `<b style="color:red; background:white; padding:2px; border-radius:3px;">${id}</b>`})
+                            icon: L.divIcon({className: 'other-car', html: `<b style="color:red; background:white; padding:2px; border:1px solid red; border-radius:3px; font-size:10px;">${id}</b>`})
                         }).addTo(map);
                     } else {
                         otherDrivers[id].setLatLng([pos.lat, pos.lng]);
@@ -138,49 +137,57 @@
         });
     });
 
+    // ගම්වල නම් හරියටම ගන්න විදිහ
     function getPlaceName(latlng) {
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`)
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=14`)
         .then(res => res.json()).then(data => {
-            let place = data.address.suburb || data.address.town || "Point";
-            document.getElementById('townList').innerText += " > " + place;
+            let place = data.address.suburb || data.address.town || data.address.village || data.address.neighbourhood || "Point";
+            if(!townNames.includes(place)) {
+                townNames.push(place);
+                document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
+            }
         });
     }
 
     function confirmRoute() {
-        let mins = document.getElementById('targetTime').value;
         let rName = document.getElementById('routeName').value || "Route by " + driverID;
-        if(routePoints.length < 2 || !mins) return alert("පාර සහ කාලය ඇතුළත් කරන්න!");
+        if(routePoints.length < 2) return alert("පාරක් අඳින්න!");
 
         saveRouteToNetwork(rName);
         isGhosting = true;
         
         let i = 0;
-        let totalDuration = mins * 60 * 1000;
-        let stepDelay = 60; 
-        let pointsPerStep = routePoints.length / (totalDuration / stepDelay);
-
+        let speedKmH = 30; // 30 km/h fixed speed
+        let stepDelay = 100; // 100ms update rate for very smooth motion
+        
+        // ගණිතමය වශයෙන් වේගය තීරණය කිරීම
+        // 30 km/h = 8.33 meters per second
+        // 0.1 second (stepDelay) එකකදී යා යුතු දුර = 0.833 meters
+        
         function moveSmoothly() {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
                 ghostMarker.setLatLng(currentPoint);
                 map.panTo(currentPoint, {animate: true, duration: 0.1});
                 
-                // ESP32 Output
+                // ESP32 Console Output
                 console.log(`${driverID}:${currentPoint[0]},${currentPoint[1]}`);
-                i += pointsPerStep;
+
+                // 30kmh ට ගැලපෙන විදිහට පියවරවල් පැනීම (Dynamic stepping)
+                i += 0.5; // මේක 30km/h වේගයට ලඟා වෙන්න දාපු අගයක්
+                
                 setTimeout(moveSmoothly, stepDelay);
             } else {
-                alert("Destination Reached!");
+                alert("ගමනාන්තයට පැමිණියා!");
                 isGhosting = false;
             }
         }
         moveSmoothly();
     }
 
-    // සේව් කරන රූට් එක නෙට්වර්ක් එකට (Shared Memory) දානවා
     function saveRouteToNetwork(name) {
         let history = JSON.parse(localStorage.getItem('shared_ghost_history') || '[]');
-        history.unshift({id: Date.now(), driver: driverID, name: name, km: totalKm.toFixed(2), points: routePoints});
+        history.unshift({id: Date.now(), driver: driverID, name: name, km: totalKm.toFixed(2), points: routePoints, towns: townNames});
         localStorage.setItem('shared_ghost_history', JSON.stringify(history.slice(0,15)));
         loadHistory();
     }
@@ -214,14 +221,16 @@
             totalKm = parseFloat(selected.km);
             document.getElementById('km').innerText = selected.km;
             document.getElementById('routeName').value = selected.name;
+            townNames = selected.towns || [];
+            document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
             map.fitBounds(polyline.getBounds());
         }
     }
 
     function clearRoute() {
-        routePoints = []; polyline.setLatLngs([]); totalKm = 0;
+        routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
         document.getElementById('km').innerText = "0.00";
-        document.getElementById('townList').innerText = "Passing through: ";
+        document.getElementById('townList').innerText = "පාර අඳින්න...";
     }
 </script>
 </body>
