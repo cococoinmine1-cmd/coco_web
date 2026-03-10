@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Final Fix</title>
+    <title>Ghost Driver - Final Stabilized</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -25,6 +25,7 @@
 
 <div id="login-screen">
     <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
+    <p style="color: #888; font-size: 12px; margin-bottom: 15px;">Global Network Active</p>
     <input type="text" id="uID" placeholder="ඔබේ නම ඇතුළත් කරන්න">
     <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
 </div>
@@ -41,14 +42,14 @@
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
     
     <div style="display:flex; gap:5px;">
-        <button class="btn-main" onclick="confirmRoute()">START</button>
+        <button class="btn-main" onclick="confirmRoute()">OK (START)</button>
         <button onclick="reCenter()" style="background:#3498db; color:white; width: 25%; border-radius: 8px;">LOCATE</button>
         <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 25%; border-radius: 8px;">CLEAR</button>
         <button onclick="logout()" style="background:#c0392b; color:white; width: 25%; border-radius: 8px;">EXIT</button>
     </div>
 
     <div class="history-panel">
-        <div id="historyList" style="font-size: 10px; color: #777;">සර්වර් එකට සම්බන්ධ වෙමින්...</div>
+        <div id="historyList" style="font-size: 10px; color: #777;">ජාලයට සම්බන්ධ වෙමින්...</div>
     </div>
 </div>
 
@@ -57,7 +58,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-    // --- ඔබේ අලුත් Firebase Configuration එක ---
+    // --- ඔබේ Firebase Configuration එක ---
     const firebaseConfig = {
         apiKey: "YOUR_API_KEY", 
         authDomain: "location-38937.firebaseapp.com",
@@ -98,7 +99,7 @@
 
     function saveUser() {
         let id = document.getElementById('uID').value.toUpperCase().trim();
-        if(!id) return alert("නමක් දාන්න!");
+        if(!id) return alert("කරුණාකර නමක් ඇතුළත් කරන්න!");
         localStorage.setItem('driver_letter', id);
         location.reload();
     }
@@ -106,7 +107,7 @@
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
-        // මෙතන setView: false කළා, එතකොට මැප් එක ඔටෝ මැදට එන්නේ නැහැ
+        // setView: false නිසා ලොකේෂන් එක මාරු වෙද්දී මැප් එක මැදට පනින්නේ නැත
         map.locate({setView: false, watch: true, maxZoom: 15});
         map.on('locationfound', (e) => {
             if(!realMarker) {
@@ -115,7 +116,7 @@
                 map.setView(e.latlng, 15); // මුලින්ම පටන් ගද්දි විතරක් මැදට ගන්නවා
             }
             db.ref('fleet/' + driverID).update({
-                lat: e.latlng.lat, lng: e.latlng.lng, time: Date.now()
+                lat: e.latlng.lat, lng: e.latlng.lng, lastSeen: Date.now()
             });
         });
     }
@@ -125,7 +126,7 @@
     }
 
     function listenToNetwork() {
-        // අනිත් අයගේ පිහිටීම
+        // 1. අනිත් අයගේ පිහිටීම (Fleet)
         db.ref('fleet').on('value', (snapshot) => {
             const data = snapshot.val();
             if(!data) return;
@@ -134,7 +135,7 @@
                     let pos = data[id];
                     if(!otherMarkers[id]) {
                         otherMarkers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'car', html: `<div style="background:red; color:white; padding:2px 5px; border-radius:4px; font-size:10px; width:max-content;">${id}</div>`})
+                            icon: L.divIcon({className: 'car', html: `<div style="background:#e74c3c; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; width:max-content; border:1px solid white;">${id}</div>`})
                         }).addTo(map);
                     } else {
                         otherMarkers[id].setLatLng([pos.lat, pos.lng]);
@@ -143,10 +144,12 @@
             });
         });
 
-        // සේව් කරපු රූට්ස්
+        // 2. සේව් කරපු රූට්ස් ලිස්ට් එක (Shared Routes)
         db.ref('shared_routes').on('value', (snapshot) => {
             const history = [];
-            snapshot.forEach((child) => history.unshift(child.val()));
+            snapshot.forEach((child) => {
+                history.unshift(child.val());
+            });
             renderHistory(history);
         });
     }
@@ -159,8 +162,8 @@
         }
         listDiv.innerHTML = history.map(r => `
             <div class="history-item" onclick="loadRouteData('${r.id}')">
-                <span><span class="badge">${r.driver}</span> ${r.name}</span>
-                <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">X</button>
+                <span style="flex-grow:1;"><span class="badge">${r.driver}</span> ${r.name} (${r.km} km)</span>
+                <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>
             </div>
         `).join('');
     }
@@ -194,7 +197,7 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("සිතියම මත ක්ලික් කර පාරක් අඳින්න!");
+        if(routePoints.length < 2) return alert("කරුණාකර පාරක් අඳින්න!");
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
         
@@ -206,12 +209,15 @@
         let i = 0;
         function move() {
             if(i < routePoints.length) {
+                // වේගය: මුල් 10% දුර 10km/h, ඉතිරි දුර 25km/h
                 let speed = (i < routePoints.length * 0.1) ? 10 : 25;
                 document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
+                
                 let currentPoint = routePoints[Math.floor(i)];
                 ghostMarker.setLatLng(currentPoint);
                 map.panTo(currentPoint);
-                i += (speed === 10) ? 0.3 : 0.7; // වේගය මෙතනින් පාලනය වේ
+                
+                i += (speed === 10) ? 0.3 : 0.6; 
                 setTimeout(move, 150);
             } else {
                 isGhosting = false;
@@ -223,25 +229,30 @@
 
     window.loadRouteData = function(id) {
         db.ref('shared_routes/' + id).once('value', (snap) => {
-            let s = snap.val();
-            if(!s) return;
+            let selected = snap.val();
+            if(!selected) return;
             clearRoute();
-            routePoints = s.points;
+            routePoints = selected.points;
             polyline.setLatLngs(routePoints);
-            totalKm = parseFloat(s.km);
-            document.getElementById('km').innerText = s.km;
-            townNames = s.towns || [];
+            totalKm = parseFloat(selected.km);
+            document.getElementById('km').innerText = selected.km;
+            townNames = selected.towns || [];
             document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
             map.fitBounds(polyline.getBounds());
         });
     }
 
     window.deleteRoute = function(id) {
-        if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove();
+        if(confirm("මෙම රූට් එක මකා දැමීමට අවශ්‍යද?")) {
+            db.ref('shared_routes/' + id).remove();
+        }
     }
 
     function clearRoute() {
-        routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
+        routePoints = []; 
+        if(polyline) polyline.setLatLngs([]); 
+        totalKm = 0; 
+        townNames = [];
         document.getElementById('km').innerText = "0.00";
         document.getElementById('townList').innerText = "සිතියම ක්ලික් කරන්න...";
     }
