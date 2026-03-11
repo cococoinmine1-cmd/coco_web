@@ -25,7 +25,7 @@
 
 <div id="login-screen">
     <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="ඔබේ වාහන අංකය (උදා: V1, V2)">
+    <input type="text" id="uID" placeholder="වාහන අංකය (V1, V2...)">
     <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
 </div>
 
@@ -36,20 +36,15 @@
         <span>KM: <span id="km">0.00</span></span>
         <span id="currentSpeedDisplay" style="color:#e74c3c;">Speed: 0 km/h</span>
     </div>
-    
     <div id="townList">පාර අඳින්න සිතියම ක්ලික් කරන්න...</div>
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
-    
     <div style="display:flex; gap:5px;">
         <button class="btn-main" onclick="confirmRoute()">OK (START)</button>
         <button onclick="reCenter()" style="background:#3498db; color:white; width: 25%; border-radius: 8px;">LOCATE</button>
         <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 25%; border-radius: 8px;">CLEAR</button>
         <button onclick="logout()" style="background:#c0392b; color:white; width: 25%; border-radius: 8px;">EXIT</button>
     </div>
-
-    <div class="history-panel">
-        <div id="historyList">සම්බන්ධ වෙමින්...</div>
-    </div>
+    <div class="history-panel"><div id="historyList">සම්බන්ධ වෙමින්...</div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -113,7 +108,7 @@
                 realMarker.setLatLng(e.latlng);
             }
             
-            // රූට් එකක් නැති වෙලාවට ඇත්තම තැන Firebase එකේ තමන්ගේ ID එකට (V1, V2 etc.) යවනවා
+            // රූට් එක පටන් ගත්තම රියල් ලොකේෂන් එක Firebase යවන එක නවත්වනවා (Logic Fix)
             if(!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 db.ref('fleet/' + driverID).set({
@@ -130,8 +125,7 @@
 
     function listenToNetwork() {
         db.ref('fleet').on('value', (snap) => {
-            const data = snap.val();
-            if(!data) return;
+            const data = snap.val(); if(!data) return;
             Object.keys(data).forEach(id => {
                 if(id !== driverID) {
                     let pos = data[id];
@@ -139,9 +133,7 @@
                         otherMarkers[id] = L.marker([pos.lat, pos.lng], {
                             icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white; white-space:nowrap;">${id}</div>`})
                         }).addTo(map);
-                    } else {
-                        otherMarkers[id].setLatLng([pos.lat, pos.lng]);
-                    }
+                    } else { otherMarkers[id].setLatLng([pos.lat, pos.lng]); }
                 }
             });
         });
@@ -149,14 +141,13 @@
         db.ref('shared_routes').on('value', (snap) => {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = "";
-            const data = snap.val();
-            if(!data) return;
+            const data = snap.val(); if(!data) return;
             Object.keys(data).reverse().forEach(key => {
                 let r = data[key];
                 let div = document.createElement('div');
                 div.className = "history-item";
                 div.onclick = () => loadRouteData(r.id);
-                div.innerHTML = `<span><span class="badge">${r.driver}</span> ${r.name} (${r.km} km)</span>
+                div.innerHTML = `<span><span class="badge">${r.driver}</span> ${r.name}</span>
                                  <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>`;
                 historyList.appendChild(div);
             });
@@ -177,8 +168,6 @@
                 document.getElementById('km').innerText = totalKm.toFixed(2);
                 updateTownNames(e.latlng);
             }
-        }).catch(err => {
-            console.log("Offline or Error: Using Local Logic");
         });
     }
 
@@ -198,32 +187,26 @@
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
         
-        // සේව් කරන රූට් එක හැමෝටම පේන්න යවනවා
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         }).then(() => {
-            isGhosting = true;
+            isGhosting = true; // මෙතනින් රියල් ලොකේෂන් අප්ඩේට් එක නවතිනවා
             let i = 0;
             function move() {
                 if(i < routePoints.length) {
                     let currentPoint = routePoints[Math.floor(i)];
                     let speed = (i < routePoints.length * 0.1) ? 5 : 12; 
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
-                    
                     ghostMarker.setLatLng(currentPoint);
                     
-                    // ESP32 එක මේ දත්ත විතරක් කියවයි (fleet/V1/...)
-                    db.ref('fleet/' + driverID).update({ 
-                        lat: currentPoint[0], 
-                        lng: currentPoint[1], 
-                        isMoving: true 
-                    });
+                    // ESP32 එකට යන්නේ මේ දත්ත විතරයි
+                    db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
                     
                     map.panTo(currentPoint);
                     i += 0.2; 
                     setTimeout(move, 250);
                 } else {
-                    isGhosting = false;
+                    isGhosting = false; // රූට් එක අවසානයේ නැවත රියල් ලොකේෂන් එක වැඩ කරයි
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
                 }
             }
