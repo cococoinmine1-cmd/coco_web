@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Final</title>
+    <title>Ghost Driver - Global Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -48,7 +48,7 @@
     </div>
 
     <div class="history-panel">
-        <div id="historyList" style="font-size: 10px; color: #777;">සම්බන්ධ වෙමින්...</div>
+        <div id="historyList" style="font-size: 10px; color: #777;">ජාලයට සම්බන්ධ වෙමින්...</div>
     </div>
 </div>
 
@@ -105,7 +105,6 @@
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
-        // setView: false නිසා මැප් එක අඳිනකොට මුලට පනින්නේ නැත
         map.locate({setView: false, watch: true, maxZoom: 15});
         map.on('locationfound', (e) => {
             if(!realMarker) {
@@ -113,16 +112,24 @@
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
                 map.setView(e.latlng, 15);
             }
-            db.ref('fleet/' + driverID).update({
-                lat: e.latlng.lat, lng: e.latlng.lng, lastSeen: Date.now()
-            });
+            
+            // අපි රූට් එකක් අඳින්නේ නැති වෙලාවට (isGhosting false නම්) 
+            // අපේ ඇත්ත ලොකේෂන් එක සර්වර් එකට යවනවා.
+            if(!isGhosting) {
+                db.ref('fleet/' + driverID).update({
+                    lat: e.latlng.lat, 
+                    lng: e.latlng.lng, 
+                    lastSeen: Date.now(),
+                    isMoving: false
+                });
+            }
         });
     }
 
     function reCenter() { if(realMarker) map.setView(realMarker.getLatLng(), 15); }
 
     function listenToNetwork() {
-        // අනිත් අයගේ පිහිටීම Update කිරීම
+        // 1. අනිත් අයගේ පිහිටීම සජීවීව පෙන්වීම (Real-time Fleet)
         db.ref('fleet').on('value', (snap) => {
             const data = snap.val();
             if(!data) return;
@@ -131,7 +138,7 @@
                     let pos = data[id];
                     if(!otherMarkers[id]) {
                         otherMarkers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'car', html: `<div style="background:#e74c3c; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white;">${id}</div>`})
+                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white;">${id}</div>`})
                         }).addTo(map);
                     } else {
                         otherMarkers[id].setLatLng([pos.lat, pos.lng]);
@@ -140,7 +147,7 @@
             });
         });
 
-        // සේව් කරපු රූට්ස් සජීවීව පෙන්වීම
+        // 2. සේව් කරපු රූට්ස් හැමෝටම පේන විදිහට පෙන්වීම
         db.ref('shared_routes').on('value', (snap) => {
             const history = [];
             snap.forEach((child) => history.unshift(child.val()));
@@ -151,7 +158,7 @@
     function renderHistory(history) {
         let listDiv = document.getElementById('historyList');
         if(history.length === 0) {
-            listDiv.innerHTML = "<div style='color:#555; text-align:center;'>No routes shared yet</div>";
+            listDiv.innerHTML = "<div style='color:#555; text-align:center;'>තවම දත්ත නැත.</div>";
             return;
         }
         listDiv.innerHTML = history.map(r => `
@@ -206,6 +213,15 @@
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
                     let currentPoint = routePoints[Math.floor(i)];
                     ghostMarker.setLatLng(currentPoint);
+                    
+                    // Ghosting කරන වෙලාවටත් ලොකේෂන් එක සර්වර් එකට යවනවා 
+                    // එවිට අනිත් අයට වාහනය යනවා පෙනේ.
+                    db.ref('fleet/' + driverID).update({
+                        lat: currentPoint[0], 
+                        lng: currentPoint[1],
+                        isMoving: true 
+                    });
+
                     map.panTo(currentPoint);
                     i += (speed === 10) ? 0.3 : 0.7; 
                     setTimeout(move, 150);
