@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Global Sync</title>
+    <title>Ghost Driver - Final Fixed</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -37,7 +37,7 @@
         <span id="currentSpeedDisplay" style="color:#e74c3c;">Speed: 0 km/h</span>
     </div>
     
-    <div id="townList">පාර අඳින්න ඕනෑම තැනක් ක්ලික් කරන්න...</div>
+    <div id="townList">පාර අඳින්න සිතියම මත ක්ලික් කරන්න...</div>
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
     
     <div style="display:flex; gap:5px;">
@@ -48,7 +48,7 @@
     </div>
 
     <div class="history-panel">
-        <div id="historyList" style="font-size: 10px; color: #777;">සර්වර් එකට සම්බන්ධ වෙමින්...</div>
+        <div id="historyList">දත්ත ලබා ගනිමින්...</div>
     </div>
 </div>
 
@@ -67,7 +67,7 @@
         appId: "මෙතනට_APP_ID_දාපන්"
     };
 
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline;
@@ -97,7 +97,7 @@
 
     function saveUser() {
         let id = document.getElementById('uID').value.toUpperCase().trim();
-        if(!id) return alert("කරුණාකර නමක් ඇතුළත් කරන්න!");
+        if(!id) return;
         localStorage.setItem('driver_letter', id);
         location.reload();
     }
@@ -108,21 +108,21 @@
         map.locate({setView: false, watch: true, maxZoom: 16});
         map.on('locationfound', (e) => {
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db', fillOpacity: 0.8}).addTo(map);
+                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db'}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
                 map.setView(e.latlng, 15);
             } else {
                 realMarker.setLatLng(e.latlng);
             }
             
-            // රූට් එකක් දුවන්නේ නැති වෙලාවට ඇත්තම ලොකේෂන් එක සර්වර් යවනවා
+            // රූට් එකක් දුවන්නේ නැතිනම් ලොකේෂන් එක සර්වර් යවනවා
             if(!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
-                db.ref('fleet/' + driverID).update({
+                db.ref('fleet/' + driverID).set({
                     lat: e.latlng.lat, 
                     lng: e.latlng.lng, 
-                    lastSeen: Date.now(),
-                    isMoving: false
+                    isMoving: false,
+                    lastSeen: Date.now()
                 });
             }
         });
@@ -140,7 +140,7 @@
                     let pos = data[id];
                     if(!otherMarkers[id]) {
                         otherMarkers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white; white-space:nowrap;">${id}</div>`})
+                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white;">${id}</div>`})
                         }).addTo(map);
                     } else {
                         otherMarkers[id].setLatLng([pos.lat, pos.lng]);
@@ -149,34 +149,30 @@
             });
         });
 
-        // සේව් කරපු රූට්ස් ලිස්ට් එක හැමෝටම පෙන්වීම
+        // සේව් කරපු රූට්ස් සජීවීව ලිස්ට් එකට ගැනීම
         db.ref('shared_routes').on('value', (snap) => {
-            const history = [];
-            snap.forEach((child) => history.unshift(child.val()));
-            renderHistory(history);
+            let historyList = document.getElementById('historyList');
+            historyList.innerHTML = "";
+            let data = snap.val();
+            if(!data) {
+                historyList.innerHTML = "<div style='color:#555; text-align:center;'>රූට්ස් නැත.</div>";
+                return;
+            }
+            Object.values(data).reverse().forEach(r => {
+                let div = document.createElement('div');
+                div.className = "history-item";
+                div.onclick = () => loadRouteData(r.id);
+                div.innerHTML = `<span><span class="badge">${r.driver}</span> ${r.name} (${r.km} km)</span>
+                                 <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>`;
+                historyList.appendChild(div);
+            });
         });
-    }
-
-    function renderHistory(history) {
-        let listDiv = document.getElementById('historyList');
-        if(history.length === 0) {
-            listDiv.innerHTML = "<div style='color:#555; text-align:center;'>තවම රූට්ස් නැත.</div>";
-            return;
-        }
-        listDiv.innerHTML = history.map(r => `
-            <div class="history-item" onclick="loadRouteData('${r.id}')">
-                <span><span class="badge">${r.driver}</span> ${r.name} (${r.km} km)</span>
-                <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>
-            </div>
-        `).join('');
     }
 
     function onMapClick(e) {
         if(isGhosting) return;
-        // රූට් එක අඳින්න පටන් ගන්න තැන: අන්තිම පොයින්ට් එක නැත්නම් ඉන්න තැන
-        let startPos = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (realMarker ? realMarker.getLatLng() : e.latlng);
-        
-        fetch(`https://router.project-osrm.org/route/v1/driving/${startPos.lng},${startPos.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
+        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (realMarker ? realMarker.getLatLng() : e.latlng);
+        fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
                 data.routes[0].geometry.coordinates.forEach(c => {
@@ -202,37 +198,26 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න!");
+        if(routePoints.length < 2) return;
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
-        
-        db.ref('shared_routes/' + rId).set({
-            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
-        }).then(() => {
+        db.ref('shared_routes/' + rId).set({ id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames })
+        .then(() => {
             isGhosting = true;
             let i = 0;
             function move() {
                 if(i < routePoints.length) {
+                    let currentPoint = routePoints[Math.floor(i)];
                     let speed = (i < routePoints.length * 0.1) ? 10 : 25;
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
-                    let currentPoint = routePoints[Math.floor(i)];
-                    
                     ghostMarker.setLatLng(currentPoint);
-                    
-                    // සර්වර් එකට මූව් වෙන එක යැවීම (ESP32 එකටත් මේක පෙනේ)
-                    db.ref('fleet/' + driverID).update({
-                        lat: currentPoint[0], 
-                        lng: currentPoint[1],
-                        isMoving: true 
-                    });
-
+                    db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
                     map.panTo(currentPoint);
                     i += (speed === 10) ? 0.3 : 0.7; 
                     setTimeout(move, 150);
                 } else {
                     isGhosting = false;
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
-                    // ඉවර වුණාම ආයෙත් ඇත්ත ලොකේෂන් එකට ස්විච් වෙන්න ඉඩ දෙයි
                 }
             }
             move();
@@ -253,14 +238,12 @@
         });
     }
 
-    window.deleteRoute = function(id) {
-        if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove();
-    }
-
+    window.deleteRoute = function(id) { if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
+    
     function clearRoute() {
         routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
         document.getElementById('km').innerText = "0.00";
-        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම ක්ලික් කරන්න...";
+        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම මත ක්ලික් කරන්න...";
     }
 </script>
 </body>
