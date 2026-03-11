@@ -196,12 +196,12 @@
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
-                let speed = 40; 
+                let speed = 10; 
                 document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
                 ghostMarker.setLatLng(currentPoint);
                 db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
                 map.panTo(currentPoint);
-                i += 0.08; 
+                i += 0.06; 
             } else {
                 clearInterval(driveLoop);
                 isGhosting = false;
