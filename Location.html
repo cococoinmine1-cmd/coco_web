@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Final Fixed</title>
+    <title>Ghost Driver - Pro Global Sync</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -37,7 +37,7 @@
         <span id="currentSpeedDisplay" style="color:#e74c3c;">Speed: 0 km/h</span>
     </div>
     
-    <div id="townList">පාර අඳින්න සිතියම මත ක්ලික් කරන්න...</div>
+    <div id="townList">පාර අඳින්න සිතියම ක්ලික් කරන්න...</div>
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
     
     <div style="display:flex; gap:5px;">
@@ -48,7 +48,7 @@
     </div>
 
     <div class="history-panel">
-        <div id="historyList">දත්ත ලබා ගනිමින්...</div>
+        <div id="historyList">සම්බන්ධ වෙමින්...</div>
     </div>
 </div>
 
@@ -67,7 +67,7 @@
         appId: "මෙතනට_APP_ID_දාපන්"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline;
@@ -115,7 +115,6 @@
                 realMarker.setLatLng(e.latlng);
             }
             
-            // රූට් එකක් දුවන්නේ නැතිනම් ලොකේෂන් එක සර්වර් යවනවා
             if(!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 db.ref('fleet/' + driverID).set({
@@ -140,7 +139,7 @@
                     let pos = data[id];
                     if(!otherMarkers[id]) {
                         otherMarkers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white;">${id}</div>`})
+                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white; white-space:nowrap;">${id}</div>`})
                         }).addTo(map);
                     } else {
                         otherMarkers[id].setLatLng([pos.lat, pos.lng]);
@@ -149,16 +148,17 @@
             });
         });
 
-        // සේව් කරපු රූට්ස් සජීවීව ලිස්ට් එකට ගැනීම
+        // සේව් කරපු දත්ත හැමෝටම පෙන්වීම (Data Sync)
         db.ref('shared_routes').on('value', (snap) => {
-            let historyList = document.getElementById('historyList');
+            const historyList = document.getElementById('historyList');
             historyList.innerHTML = "";
-            let data = snap.val();
+            const data = snap.val();
             if(!data) {
-                historyList.innerHTML = "<div style='color:#555; text-align:center;'>රූට්ස් නැත.</div>";
+                historyList.innerHTML = "<div style='color:#555; text-align:center;'>දත්ත නැත.</div>";
                 return;
             }
-            Object.values(data).reverse().forEach(r => {
+            Object.keys(data).reverse().forEach(key => {
+                let r = data[key];
                 let div = document.createElement('div');
                 div.className = "history-item";
                 div.onclick = () => loadRouteData(r.id);
@@ -198,23 +198,28 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return;
+        if(routePoints.length < 2) return alert("රූට් එකක් අඳින්න!");
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
-        db.ref('shared_routes/' + rId).set({ id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames })
-        .then(() => {
+        
+        db.ref('shared_routes/' + rId).set({
+            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
+        }).then(() => {
             isGhosting = true;
             let i = 0;
             function move() {
                 if(i < routePoints.length) {
                     let currentPoint = routePoints[Math.floor(i)];
-                    let speed = (i < routePoints.length * 0.1) ? 10 : 25;
+                    // වේගය සෑහෙන්න අඩු කළා
+                    let speed = (i < routePoints.length * 0.1) ? 5 : 12; 
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
+                    
                     ghostMarker.setLatLng(currentPoint);
                     db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
                     map.panTo(currentPoint);
-                    i += (speed === 10) ? 0.3 : 0.7; 
-                    setTimeout(move, 150);
+                    
+                    i += 0.2; // මූව් වෙන පියවරවල් ප්‍රමාණය අඩු කළා (Smooth & Slow)
+                    setTimeout(move, 250); // කාලය වැඩි කළා (Slow speed)
                 } else {
                     isGhosting = false;
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
@@ -243,7 +248,7 @@
     function clearRoute() {
         routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
         document.getElementById('km').innerText = "0.00";
-        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම මත ක්ලික් කරන්න...";
+        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම ක්ලික් කරන්න...";
     }
 </script>
 </body>
