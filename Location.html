@@ -57,8 +57,8 @@
         databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
         projectId: "cococoin-mine",
         storageBucket: "cococoin-mine.appspot.com",
-        messagingSenderId: "මෙතනට_SENDER_ID_දාපන්",
-        appId: "මෙතනට_APP_ID_දාපන්"
+        messagingSenderId: "717018135256",
+        appId: "location-38937"
     };
 
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -105,7 +105,6 @@
                 map.setView(e.latlng, 15);
             }
             
-            // රූට් එකක් දුවන වෙලාවට මේ ලොජික් එක බ්ලොක් කරනවා
             if(isGhosting) return; 
 
             realMarker.setLatLng(e.latlng);
@@ -187,7 +186,6 @@
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
 
-        // 1. සිතියම මත රූට් එක සේව් කරනවා (Global History)
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         });
@@ -196,16 +194,16 @@
         if(realMarker) realMarker.setStyle({opacity: 0, fillOpacity: 0});
         
         let i = 0;
-        // 2. රූට් එකේ හැම පියවරක්ම සර්වර් එකට යවනවා
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
-                let speed = (i < routePoints.length * 0.05) ? 5 : 10; 
+                
+                // වේගය පෙන්වන අගය හෙමින් යන අගයකට වෙනස් කළා
+                let speed = 40; 
                 document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
                 
                 ghostMarker.setLatLng(currentPoint);
                 
-                // ESP32 එක මේක තමයි කියවන්නේ
                 db.ref('fleet/' + driverID).update({ 
                     lat: currentPoint[0], 
                     lng: currentPoint[1], 
@@ -213,7 +211,9 @@
                 });
                 
                 map.panTo(currentPoint);
-                i += 0.2; // මේ අගය වෙනස් කරලා වේගය පාලනය කරන්න පුළුවන්
+                
+                // මේක තමයි වේගය (0.2 තිබුණ එක 0.08 කළා - දැන් ගොඩක් හෙමින් යයි)
+                i += 0.08; 
             } else {
                 clearInterval(driveLoop);
                 isGhosting = false;
@@ -221,7 +221,7 @@
                 document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
                 alert("රූට් එක අවසන්!");
             }
-        }, 250); // තත්පර කාලෙන් කාලෙට සර්වර් අප්ඩේට් එක යනවා
+        }, 250); 
     }
 
     window.loadRouteData = function(id) {
