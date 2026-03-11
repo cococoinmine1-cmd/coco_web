@@ -15,7 +15,10 @@
         .btn-main { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
         .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 120px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
-        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #222; font-size: 11px; color: #3498db; cursor: pointer; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #222; cursor: pointer; }
+        .route-info { display: flex; flex-direction: column; font-size: 11px; }
+        .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 3px; font-weight: bold; margin-right: 5px; }
+        .km-label { color: #f1c40f; font-size: 10px; margin-top: 2px; }
         .del-btn { background: #c0392b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
         #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
     </style>
@@ -57,8 +60,8 @@
         databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
         projectId: "cococoin-mine",
         storageBucket: "cococoin-mine.appspot.com",
-        messagingSenderId: "717018135256",
-        appId: "location-38937"
+        messagingSenderId: "මෙතනට_SENDER_ID_දාපන්",
+        appId: "මෙතනට_APP_ID_දාපන්"
     };
 
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -104,12 +107,9 @@
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
                 map.setView(e.latlng, 15);
             }
-            
             if(isGhosting) return; 
-
             realMarker.setLatLng(e.latlng);
             ghostMarker.setLatLng(e.latlng);
-            
             db.ref('fleet/' + driverID).set({
                 lat: e.latlng.lat, 
                 lng: e.latlng.lng, 
@@ -145,7 +145,10 @@
                 let div = document.createElement('div');
                 div.className = "history-item";
                 div.onclick = () => loadRouteData(r.id);
-                div.innerHTML = `<span><span class="badge" style="background:#3498db">${r.driver}</span> ${r.name}</span>
+                div.innerHTML = `<div class="route-info">
+                                    <span><span class="badge">${r.driver}</span> <b>${r.name}</b></span>
+                                    <span class="km-label">📏 ${r.km} KM | 📍 ${r.towns ? r.towns.length : 0} Towns</span>
+                                 </div>
                                  <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>`;
                 historyList.appendChild(div);
             });
@@ -182,37 +185,22 @@
 
     function confirmRoute() {
         if(routePoints.length < 2) return alert("රූට් එකක් අඳින්න!");
-        
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
-
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         });
-
         isGhosting = true;
         if(realMarker) realMarker.setStyle({opacity: 0, fillOpacity: 0});
-        
         let i = 0;
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
-                
-                // වේගය පෙන්වන අගය හෙමින් යන අගයකට වෙනස් කළා
                 let speed = 40; 
                 document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
-                
                 ghostMarker.setLatLng(currentPoint);
-                
-                db.ref('fleet/' + driverID).update({ 
-                    lat: currentPoint[0], 
-                    lng: currentPoint[1], 
-                    isMoving: true 
-                });
-                
+                db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
                 map.panTo(currentPoint);
-                
-                // මේක තමයි වේගය (0.2 තිබුණ එක 0.08 කළා - දැන් ගොඩක් හෙමින් යයි)
                 i += 0.08; 
             } else {
                 clearInterval(driveLoop);
@@ -231,8 +219,9 @@
             routePoints = s.points;
             polyline.setLatLngs(routePoints);
             totalKm = parseFloat(s.km);
+            townNames = s.towns || [];
             document.getElementById('km').innerText = s.km;
-            document.getElementById('townList').innerHTML = "📍 " + (s.towns ? s.towns.join(" → ") : "Loaded Route");
+            document.getElementById('townList').innerHTML = "📍 " + (townNames.length > 0 ? townNames.join(" → ") : "Loaded Route");
             map.fitBounds(polyline.getBounds());
         });
     }
