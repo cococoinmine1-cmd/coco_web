@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Global Sync</title>
+    <title>Ghost Driver - Hybrid Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -70,6 +70,12 @@
     let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
     let otherMarkers = {};
 
+    // Screen off වුණත් වැඩ කරන්න Web Worker එකක් simulate කරනවා (No-sleep logic)
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+    }
+
     function initMap() {
         if (map) return;
         map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
@@ -85,6 +91,7 @@
             initMap();
             initGPS();
             listenToNetwork();
+            requestWakeLock();
         }
     };
 
@@ -98,7 +105,7 @@
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
 
     function initGPS() {
-        map.locate({setView: false, watch: true, maxZoom: 16});
+        map.locate({setView: false, watch: true, maxZoom: 16, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
             if(!realMarker) {
                 realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db'}).addTo(map);
@@ -108,7 +115,7 @@
                 realMarker.setLatLng(e.latlng);
             }
             
-            // රූට් එක පටන් ගත්තම රියල් ලොකේෂන් එක Firebase යවන එක නවත්වනවා (Logic Fix)
+            // රූට් එකක් දුවන්නේ නැතිනම් පමණක් ඇත්තම තැන (Real GPS) Firebase එකට යවනවා
             if(!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 db.ref('fleet/' + driverID).set({
@@ -183,34 +190,41 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("රූට් එකක් අඳින්න!");
+        if(routePoints.length < 2) return alert("රූට් එකක් අඳින්න හෝ Load කරන්න!");
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
         
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         }).then(() => {
-            isGhosting = true; // මෙතනින් රියල් ලොකේෂන් අප්ඩේට් එක නවතිනවා
+            isGhosting = true;
+            if(realMarker) map.removeLayer(realMarker); // රියල් තැන හංගනවා
+            
             let i = 0;
-            function move() {
+            // Screen Off වුණත් වැඩ කරන්න Interval එකක් පාවිච්චි කරනවා
+            const driveInterval = setInterval(() => {
                 if(i < routePoints.length) {
                     let currentPoint = routePoints[Math.floor(i)];
                     let speed = (i < routePoints.length * 0.1) ? 5 : 12; 
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
-                    ghostMarker.setLatLng(currentPoint);
                     
-                    // ESP32 එකට යන්නේ මේ දත්ත විතරයි
-                    db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
+                    ghostMarker.setLatLng(currentPoint);
+                    // ESP32 එකට Real-time දත්ත යවනවා
+                    db.ref('fleet/' + driverID).update({ 
+                        lat: currentPoint[0], 
+                        lng: currentPoint[1], 
+                        isMoving: true 
+                    });
                     
                     map.panTo(currentPoint);
                     i += 0.2; 
-                    setTimeout(move, 250);
                 } else {
-                    isGhosting = false; // රූට් එක අවසානයේ නැවත රියල් ලොකේෂන් එක වැඩ කරයි
+                    clearInterval(driveInterval);
+                    isGhosting = false; 
+                    if(realMarker) realMarker.addTo(map); // රූට් එක ඉවර වුණාම රියල් තැන පෙන්වනවා
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
                 }
-            }
-            move();
+            }, 250);
         });
     }
 
