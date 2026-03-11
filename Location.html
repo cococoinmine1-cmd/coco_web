@@ -25,7 +25,7 @@
 
 <div id="login-screen">
     <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="ඔබේ නම ඇතුළත් කරන්න">
+    <input type="text" id="uID" placeholder="ඔබේ වාහන අංකය (උදා: V1, V2)">
     <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
 </div>
 
@@ -71,7 +71,7 @@
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline;
-    let driverID = "";
+    let driverID = localStorage.getItem('driver_letter') || "";
     let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
     let otherMarkers = {};
 
@@ -84,9 +84,7 @@
     }
 
     window.onload = function() {
-        let saved = localStorage.getItem('driver_letter');
-        if(saved) {
-            driverID = saved;
+        if(driverID) {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('dispID').innerText = driverID;
             initMap();
@@ -115,6 +113,7 @@
                 realMarker.setLatLng(e.latlng);
             }
             
+            // රූට් එකක් නැති වෙලාවට ඇත්තම තැන Firebase එකේ තමන්ගේ ID එකට (V1, V2 etc.) යවනවා
             if(!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 db.ref('fleet/' + driverID).set({
@@ -130,7 +129,6 @@
     function reCenter() { if(realMarker) map.setView(realMarker.getLatLng(), 15); }
 
     function listenToNetwork() {
-        // අනිත් හැමෝම පෙන්වීම
         db.ref('fleet').on('value', (snap) => {
             const data = snap.val();
             if(!data) return;
@@ -148,15 +146,11 @@
             });
         });
 
-        // සේව් කරපු දත්ත හැමෝටම පෙන්වීම (Data Sync)
         db.ref('shared_routes').on('value', (snap) => {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = "";
             const data = snap.val();
-            if(!data) {
-                historyList.innerHTML = "<div style='color:#555; text-align:center;'>දත්ත නැත.</div>";
-                return;
-            }
+            if(!data) return;
             Object.keys(data).reverse().forEach(key => {
                 let r = data[key];
                 let div = document.createElement('div');
@@ -183,6 +177,8 @@
                 document.getElementById('km').innerText = totalKm.toFixed(2);
                 updateTownNames(e.latlng);
             }
+        }).catch(err => {
+            console.log("Offline or Error: Using Local Logic");
         });
     }
 
@@ -202,6 +198,7 @@
         let rName = document.getElementById('routeName').value || "New Route";
         let rId = Date.now().toString();
         
+        // සේව් කරන රූට් එක හැමෝටම පේන්න යවනවා
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         }).then(() => {
@@ -210,16 +207,21 @@
             function move() {
                 if(i < routePoints.length) {
                     let currentPoint = routePoints[Math.floor(i)];
-                    // වේගය සෑහෙන්න අඩු කළා
                     let speed = (i < routePoints.length * 0.1) ? 5 : 12; 
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
                     
                     ghostMarker.setLatLng(currentPoint);
-                    db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
-                    map.panTo(currentPoint);
                     
-                    i += 0.2; // මූව් වෙන පියවරවල් ප්‍රමාණය අඩු කළා (Smooth & Slow)
-                    setTimeout(move, 250); // කාලය වැඩි කළා (Slow speed)
+                    // ESP32 එක මේ දත්ත විතරක් කියවයි (fleet/V1/...)
+                    db.ref('fleet/' + driverID).update({ 
+                        lat: currentPoint[0], 
+                        lng: currentPoint[1], 
+                        isMoving: true 
+                    });
+                    
+                    map.panTo(currentPoint);
+                    i += 0.2; 
+                    setTimeout(move, 250);
                 } else {
                     isGhosting = false;
                     document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
