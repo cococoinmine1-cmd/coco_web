@@ -200,7 +200,7 @@
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
-                let speed = (i < routePoints.length * 0.1) ? 5 : 12; 
+                let speed = (i < routePoints.length * 0.05) ? 5 : 10; 
                 document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
                 
                 ghostMarker.setLatLng(currentPoint);
