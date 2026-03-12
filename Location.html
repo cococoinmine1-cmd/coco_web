@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Smooth Sync</title>
+    <title>Ghost Driver - Smart Sync</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -21,6 +21,7 @@
         .km-label { color: #f1c40f; font-size: 10px; margin-top: 2px; }
         .del-btn { background: #c0392b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
         #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
+        .status-ghost { color: #f1c40f; font-size: 10px; text-align: center; display: none; }
     </style>
 </head>
 <body>
@@ -33,6 +34,7 @@
 
 <div id="map"></div>
 <div class="panel">
+    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE - REAL GPS PAUSED</div>
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
@@ -55,7 +57,7 @@
 
 <script>
     const firebaseConfig = {
-        apiKey: "මෙතනට_උඹේ_API_KEY_දාපන්", 
+        apiKey: "YOUR_FIREBASE_API_KEY", // මෙතනට අනිවාර්යයෙන් API Key එක දාපන්
         authDomain: "cococoin-mine.firebaseapp.com",
         databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
         projectId: "cococoin-mine",
@@ -71,6 +73,7 @@
     let driverID = localStorage.getItem('driver_letter') || "";
     let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
     let otherMarkers = {};
+    let lastRealPos = null;
 
     function initMap() {
         if (map) return;
@@ -102,26 +105,36 @@
     function initGPS() {
         map.locate({setView: false, watch: true, maxZoom: 16, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
+            lastRealPos = e.latlng;
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db'}).addTo(map);
+                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db', fillOpacity: 0.5}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
                 map.setView(e.latlng, 15);
             }
-            if(isGhosting) return; 
+            
             realMarker.setLatLng(e.latlng);
-            ghostMarker.setLatLng(e.latlng);
-            db.ref('fleet/' + driverID).set({
-                lat: e.latlng.lat, 
-                lng: e.latlng.lng, 
-                isMoving: false,
-                lastSeen: Date.now()
-            });
+
+            // GHOST MODE OFF නම් විතරක් Real Position එක Firebase එකට යවනවා
+            if(!isGhosting) {
+                ghostMarker.setLatLng(e.latlng);
+                db.ref('fleet/' + driverID).set({
+                    lat: e.latlng.lat, 
+                    lng: e.latlng.lng, 
+                    isMoving: false,
+                    lastSeen: Date.now(),
+                    mode: "REAL"
+                });
+            }
         });
     }
 
-    function reCenter() { if(realMarker) map.setView(realMarker.getLatLng(), 15); }
+    function reCenter() { 
+        let target = isGhosting ? ghostMarker.getLatLng() : realMarker.getLatLng();
+        if(target) map.setView(target, 15); 
+    }
 
     function listenToNetwork() {
+        // අනිත් ඔක්කොම වාහන සිතියමේ පෙන්වීම
         db.ref('fleet').on('value', (snap) => {
             const data = snap.val(); if(!data) return;
             Object.keys(data).forEach(id => {
@@ -136,6 +149,7 @@
             });
         });
 
+        // Shared Routes ලිස්ට් එක Update කිරීම
         db.ref('shared_routes').on('value', (snap) => {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = "";
@@ -157,7 +171,7 @@
 
     function onMapClick(e) {
         if(isGhosting) return;
-        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (realMarker ? realMarker.getLatLng() : e.latlng);
+        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
@@ -184,35 +198,69 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("රූට් එකක් අඳින්න!");
-        let rName = document.getElementById('routeName').value || "New Route";
+        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න හෝ තෝරන්න!");
+        
+        // රූට් එක Database එකට Save කරනවා (අනිත් අයටත් පේන්න)
+        let rName = document.getElementById('routeName').value || "Quick Route";
         let rId = Date.now().toString();
         db.ref('shared_routes/' + rId).set({
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
         });
+
+        startGhostDrive();
+    }
+
+    function startGhostDrive() {
         isGhosting = true;
-        if(realMarker) realMarker.setStyle({opacity: 0, fillOpacity: 0});
+        document.getElementById('ghostStatus').style.display = 'block';
+        if(realMarker) realMarker.setStyle({color: '#555', fillOpacity: 0.1});
+        
         let i = 0;
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
                 let currentPoint = routePoints[Math.floor(i)];
-                let speed = 10; 
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${speed} km/h`;
                 ghostMarker.setLatLng(currentPoint);
-                db.ref('fleet/' + driverID).update({ lat: currentPoint[0], lng: currentPoint[1], isMoving: true });
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: 45 km/h`;
+                
+                // Firebase එකට යවන්නේ Virtual ලොකේෂන් එක
+                db.ref('fleet/' + driverID).update({ 
+                    lat: currentPoint[0], 
+                    lng: currentPoint[1], 
+                    isMoving: true,
+                    mode: "GHOST"
+                });
+                
                 map.panTo(currentPoint);
-                i += 0.06; 
+                i += 0.5; // ගමනාගමන වේගය පාලනයට
             } else {
                 clearInterval(driveLoop);
-                isGhosting = false;
-                if(realMarker) realMarker.setStyle({opacity: 1, fillOpacity: 0.07});
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
-                alert("රූට් එක අවසන්!");
+                endGhostDrive();
             }
-        }, 250); 
+        }, 500); 
     }
 
+    function endGhostDrive() {
+        isGhosting = false;
+        document.getElementById('ghostStatus').style.display = 'none';
+        document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
+        if(realMarker) realMarker.setStyle({color: '#3498db', fillOpacity: 0.5});
+        alert("ගමන අවසන්! සැබෑ ලොකේෂන් එක ක්‍රියාත්මකයි.");
+        
+        // ආයෙත් රියල් ලොකේෂන් එකට ස්විච් වෙනවා
+        if(lastRealPos) {
+            ghostMarker.setLatLng(lastRealPos);
+            db.ref('fleet/' + driverID).update({ 
+                lat: lastRealPos.lat, 
+                lng: lastRealPos.lng, 
+                isMoving: false,
+                mode: "REAL"
+            });
+        }
+    }
+
+    // තව කෙනෙක් ඇන්ද රූට් එකක් ලෝඩ් කරගැනීම
     window.loadRouteData = function(id) {
+        if(isGhosting) return alert("දැනටමත් ගමනක් යනවා!");
         db.ref('shared_routes/' + id).once('value', (snap) => {
             let s = snap.val(); if(!s) return;
             clearRoute();
@@ -223,12 +271,14 @@
             document.getElementById('km').innerText = s.km;
             document.getElementById('townList').innerHTML = "📍 " + (townNames.length > 0 ? townNames.join(" → ") : "Loaded Route");
             map.fitBounds(polyline.getBounds());
+            alert(s.driver + " ගේ රූට් එක ලෝඩ් වුණා. OK ඔබලා ගමන අරඹන්න.");
         });
     }
 
-    window.deleteRoute = function(id) { if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
+    window.deleteRoute = function(id) { if(confirm("මෙම රූට් එක මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
     
     function clearRoute() {
+        if(isGhosting) return;
         routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
         document.getElementById('km').innerText = "0.00";
         document.getElementById('townList').innerText = "පාර අඳින්න සිතියම ක්ලික් කරන්න...";
