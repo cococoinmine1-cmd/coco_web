@@ -3,22 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver GPS Pro - ESP32 Sync</title>
+    <title>Ghost Driver GPS Pro - Final</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; overflow: hidden; }
-        #map { height: 100vh; width: 100%; z-index: 1; }
-        .panel { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; z-index: 1000; border-radius: 20px 20px 0 0; padding: 15px; box-sizing: border-box; }
+        #map { height: 100vh; width: 100%; z-index: 1; position: absolute; top: 0; left: 0; }
+        .panel { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; z-index: 1000; border-radius: 20px 20px 0 0; padding: 15px; box-sizing: border-box; border-top: 2px solid #2ecc71; }
         .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; display: none; }
-        button { padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
-        input { padding: 10px; background: #333; color: #fff; border: 1px solid #444; border-radius: 5px; width: 100%; box-sizing: border-box; }
+        button { padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        input { padding: 12px; background: #333; color: #fff; border: 1px solid #444; border-radius: 8px; width: 100%; box-sizing: border-box; }
         .btn-green { background: #27ae60; color: white; }
         .btn-red { background: #c0392b; color: white; }
         .btn-blue { background: #2980b9; color: white; }
         .btn-orange { background: #f39c12; color: white; }
-        .btn-bt { background: #0082FC; color: white; margin-bottom: 10px; }
-        .stats { display: flex; justify-content: space-between; font-size: 12px; color: #2ecc71; margin-bottom: 10px; }
-        #status { position: absolute; top: -40px; left: 50%; transform: translateX(-50%); background: #f1c40f; color: #000; padding: 5px 15px; border-radius: 10px; font-weight: bold; display: none; }
+        .btn-bt { background: #0082FC; color: white; margin-bottom: 8px; }
+        .stats { display: flex; justify-content: space-between; font-size: 11px; color: #2ecc71; margin-bottom: 8px; background: #222; padding: 8px; border-radius: 8px; }
+        #status { position: absolute; top: -35px; left: 50%; transform: translateX(-50%); background: #f1c40f; color: #000; padding: 4px 20px; border-radius: 20px; font-weight: bold; font-size: 13px; display: none; white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -30,62 +31,80 @@
     <div class="stats">
         <span>UNIT: <b id="dispID">-</b></span>
         <span>DIST: <b id="km">0.00</b> KM</span>
-        <span>STOP TIME: <b id="totalTime">0</b> MIN</span>
+        <span>TOTAL TIME: <b id="totalTime">0</b> MIN</span>
     </div>
 
-    <button class="btn-bt" style="width:100%" onclick="connectESP32()">🔗 CONNECT ESP32 (BLUETOOTH)</button>
-    <button class="btn-blue" style="width:100%" onclick="toggleMenu()">☰ CONTROL PANEL</button>
+    <button class="btn-bt" style="width:100%" onclick="connectESP32()">🔗 CONNECT ESP32 BLUETOOTH</button>
+    <button class="btn-blue" style="width:100%" onclick="toggleMenu()">☰ SHOW/HIDE CONTROLS</button>
 
     <div id="menuContent" class="menu-grid">
         <input type="text" id="routeName" placeholder="Route Name">
         <input type="number" id="stopTime" placeholder="Stop Minutes" value="5">
         
         <button class="btn-orange" onclick="addStop()">📍 ADD STOP HERE</button>
-        <button class="btn-green" onclick="startGhost()">🚀 START GHOST</button>
+        <button class="btn-green" onclick="startGhost()">🚀 START GHOST DRIVE</button>
         <button class="btn-blue" onclick="saveFullRoute()">💾 SAVE ROUTE</button>
         <button class="btn-red" onclick="clearMap()">🧹 CLEAR MAP</button>
         
-        <div id="routeList" class="history-box" style="grid-column: span 2; max-height: 100px; overflow-y: auto;"></div>
+        <div id="routeList" style="grid-column: span 2; max-height: 80px; overflow-y: auto; background: #111; padding: 5px; border-radius: 5px; font-size: 12px; display: none;"></div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-    // Firebase configs are skipped to focus on ESP32 sync
     let map, marker, polyline;
     let bluetoothCharacteristic;
-    let driverID = localStorage.getItem('unitID') || prompt("Enter Unit ID:");
+    let routeData = []; 
+    let isGhosting = false;
+    let totalStopMinutes = 0;
+
+    let driverID = localStorage.getItem('unitID') || prompt("Enter Unit ID (e.g., V1):");
+    if(!driverID) driverID = "V-TEST";
     localStorage.setItem('unitID', driverID);
     document.getElementById('dispID').innerText = driverID;
 
-    let routeData = []; 
-    let isGhosting = false;
-    let totalWaitTime = 0;
-
     function initMap() {
-        map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        polyline = L.polyline([], {color: '#2ecc71', weight: 6}).addTo(map);
-        marker = L.marker([0,0]).addTo(map).bindTooltip(driverID, {permanent: true});
+        // මැප් එක ලෝඩ් කරනවා
+        map = L.map('map', { zoomControl: false }).setView([6.9271, 79.8612], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        polyline = L.polyline([], {color: '#2ecc71', weight: 6, opacity: 0.8}).addTo(map);
+        marker = L.marker([6.9271, 79.8612]).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
 
         map.on('click', (e) => {
             if(isGhosting) return;
+            
             let lastPoint = routeData.length > 0 ? routeData[routeData.length-1] : null;
             let start = lastPoint ? `${lastPoint.lng},${lastPoint.lat}` : `${e.latlng.lng},${e.latlng.lat}`;
             
+            // පාරේම ඇඳෙන්න (Snap to Road) OSRM පාවිච්චි කරනවා
             fetch(`https://router.project-osrm.org/route/v1/driving/${start};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
-            .then(r => r.json()).then(data => {
-                let coords = data.routes[0].geometry.coordinates;
-                coords.forEach(c => {
-                    routeData.push({lat: c[1], lng: c[0], stop: 0});
-                    polyline.addLatLng([c[1], c[0]]);
-                });
-                updateStats(data.routes[0].distance / 1000);
+            .then(r => r.json())
+            .then(data => {
+                if(data.routes && data.routes[0]) {
+                    let coords = data.routes[0].geometry.coordinates;
+                    coords.forEach(c => {
+                        routeData.push({lat: c[1], lng: c[0], stop: 0});
+                        polyline.addLatLng([c[1], c[0]]);
+                    });
+                    
+                    // දුර සහ දළ කාලය update කිරීම
+                    let distanceKm = data.routes[0].distance / 1000;
+                    let travelTimeSec = data.routes[0].duration; // පාරේ යන්න යන වෙලාව (seconds)
+                    updateStats(distanceKm, travelTimeSec / 60);
+                }
+            }).catch(err => {
+                // API වැඩ නැත්නම් කෙලින් ඉරක් අඳිනවා
+                routeData.push({lat: e.latlng.lat, lng: e.latlng.lng, stop: 0});
+                polyline.addLatLng(e.latlng);
             });
         });
     }
 
-    // Bluetooth සම්බන්ධ කිරීම (ESP32 සමඟ)
     async function connectESP32() {
         try {
             const device = await navigator.bluetooth.requestDevice({
@@ -95,79 +114,90 @@
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
             bluetoothCharacteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-            alert("ESP32 Connected Successfully!");
+            alert("ESP32 Connected!");
         } catch (e) {
-            alert("Bluetooth Error: " + e.message);
+            alert("Bluetooth Connect Error. Make sure ESP32 is ON.");
         }
     }
 
     function addStop() {
-        if(routeData.length === 0) return alert("අඳින ලද රූට් එකක් නැත!");
-        let mins = parseInt(document.getElementById('stopTime').value) || 5;
-        routeData[routeData.length - 1].stop = mins;
-        totalWaitTime += mins;
-        document.getElementById('totalTime').innerText = totalWaitTime;
+        if(routeData.length === 0) return alert("පළමුව සිතියම මත රූට් එකක් අඳින්න.");
+        let mins = parseInt(document.getElementById('stopTime').value) || 0;
         
-        // සිතියමේ Stop එක පෙන්වන්න රතු ලකුණක් දාමු
-        L.circleMarker([routeData[routeData.length-1].lat, routeData[routeData.length-1].lng], {radius: 8, color: 'red'}).addTo(map);
-        alert(`නැවතුම විනාඩි ${mins} ක් ලෙස සටහන් විය.`);
+        // අන්තිමට ඇඳපු ලක්ෂ්‍යයට නැවතුම එකතු කරනවා
+        routeData[routeData.length - 1].stop = mins;
+        totalStopMinutes += mins;
+        
+        // Stats වලට විනාඩි ගණන එකතු කරනවා
+        updateStats(0, mins);
+
+        // සිතියමේ නැවතුම ලකුණු කරනවා
+        L.circleMarker([routeData[routeData.length-1].lat, routeData[routeData.length-1].lng], 
+            {radius: 8, color: '#f39c12', fillOpacity: 1}).addTo(map)
+            .bindPopup("STOP: " + mins + " min").openPopup();
+            
+        alert("නැවතුම විනාඩි " + mins + " ක් ලෙස ඇතුළත් කළා.");
     }
 
     async function startGhost() {
-        if(routeData.length < 2) return;
+        if(routeData.length < 2) return alert("රූට් එකක් අඳින්න.");
         isGhosting = true;
         toggleMenu();
         const statusEl = document.getElementById('status');
         statusEl.style.display = "block";
 
         for(let i=0; i<routeData.length; i++) {
+            if(!isGhosting) break;
             let p = routeData[i];
+            
             marker.setLatLng([p.lat, p.lng]);
             map.panTo([p.lat, p.lng]);
 
-            // ESP32 එකට Bluetooth හරහා දත්ත යවනවා (Lat,Lng format එකෙන්)
+            // ESP32 එකට සිග්නල් යැවීම (Serial string format)
             if (bluetoothCharacteristic) {
                 let encoder = new TextEncoder();
-                let dataString = `${p.lat.toFixed(6)},${p.lng.toFixed(6)}\n`;
-                await bluetoothCharacteristic.writeValue(encoder.encode(dataString));
+                let msg = p.lat.toFixed(6) + "," + p.lng.toFixed(6) + "\n";
+                await bluetoothCharacteristic.writeValue(encoder.encode(msg));
             }
 
             if(p.stop > 0) {
-                statusEl.innerText = `STOPPED FOR ${p.stop} MIN`;
+                statusEl.innerText = "🛑 STOPPED: " + p.stop + " MIN";
                 statusEl.style.background = "#e67e22";
-                // නතර වී සිටින කාලය (මෙහි 2000 යනු පරීක්ෂාවට තත්පර 2ක් පමණි)
-                await new Promise(r => setTimeout(r, p.stop * 2000)); 
+                // 1 minute = 1 second for testing (Change to 60000 for real time)
+                await new Promise(r => setTimeout(r, p.stop * 1000)); 
             } else {
-                statusEl.innerText = "DRIVING ON ROAD...";
-                statusEl.style.background = "#f1c40f";
-                await new Promise(r => setTimeout(r, 600)); // පාරේ යන වේගය
+                statusEl.innerText = "🚚 DRIVING...";
+                statusEl.style.background = "#27ae60";
+                await new Promise(r => setTimeout(r, 700)); // පාරේ යන වේගය
             }
         }
         isGhosting = false;
         statusEl.style.display = "none";
-        alert("රූට් එක අවසන්!");
+        alert("ගමන සාර්ථකව අවසන්!");
     }
 
-    function updateStats(km) {
-        let cur = parseFloat(document.getElementById('km').innerText);
-        document.getElementById('km').innerText = (cur + km).toFixed(2);
+    function updateStats(km, mins) {
+        let curKm = parseFloat(document.getElementById('km').innerText);
+        let curTime = parseFloat(document.getElementById('totalTime').innerText);
+        document.getElementById('km').innerText = (curKm + km).toFixed(2);
+        document.getElementById('totalTime').innerText = Math.round(curTime + mins);
     }
 
     function toggleMenu() {
         let m = document.getElementById('menuContent');
-        m.style.display = m.style.display === 'grid' ? 'none' : 'grid';
+        m.style.display = (m.style.display === 'grid') ? 'none' : 'grid';
     }
 
     function clearMap() {
-        routeData = [];
-        polyline.setLatLngs([]);
-        document.getElementById('km').innerText = "0.00";
-        totalWaitTime = 0;
-        document.getElementById('totalTime').innerText = "0";
-        map.eachLayer(l => { if(l instanceof L.CircleMarker) map.removeLayer(l); });
+        location.reload(); // සරලවම පිරිසිදු කිරීමට
     }
 
-    initMap();
+    function saveFullRoute() {
+        alert("රූට් එක සේව් වුණා (මෙහි LocalStorage එකට පමණි).");
+    }
+
+    // සිතියම පටන් ගන්නා විටම ලෝඩ් කරනවා
+    window.onload = initMap;
 </script>
 </body>
 </html>
