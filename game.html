@@ -3,55 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Pro Road Sync</title>
+    <title>Ghost Driver Pro - ESP32 Sync</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 45vh; width: 100%; background: #222; }
-        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
+        #map { height: 50vh; width: 100%; background: #222; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); height: 50vh; }
         input, button { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 13px; box-sizing: border-box; }
         input { background: #333; color: white; border: 1px solid #444; }
         .btn-main { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 11px; }
-        .history-panel { background: #111; border-radius: 8px; padding: 5px; max-height: 80px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
-        #townList { font-size: 10px; color: #f1c40f; height: 30px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
-        .status-ghost { color: #f1c40f; font-size: 10px; text-align: center; display: none; font-weight: bold; padding: 5px; background: rgba(241, 196, 15, 0.1); border-radius: 5px; }
-        .stop-label { background: #e74c3c; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; border: 1px solid white; white-space: nowrap; }
+        .menu-overlay { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: #1a1a1a; z-index: 2000; padding: 20px; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
+        .history-panel { background: #111; border-radius: 8px; padding: 5px; max-height: 120px; overflow-y: auto; border: 1px solid #333; }
+        .history-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #222; font-size: 11px; }
+        .stop-label { background: #e74c3c; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; }
         .active-draw { background: #f1c40f !important; color: black !important; }
+        .fab-settings { position: absolute; top: -60px; right: 20px; background: #3498db; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
-    <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="වාහන අංකය (V1, V2...)">
+    <h1 style="color: #27ae60;">Ghost Driver</h1>
+    <input type="text" id="uID" placeholder="වාහන අංකය (උදා: V1)">
     <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
 </div>
 
 <div id="map"></div>
 <div class="panel">
-    <div id="ghostStatus" class="status-ghost">🚗 GHOST DRIVING... (20 KM/H SPEED)</div>
+    <div class="fab-settings" onclick="toggleMenu()">⚙️</div>
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
-        <span>KM: <span id="km">0.00</span></span>
-        <span>🕒 <span id="estTime">0m</span></span>
+        <span>KM: <span id="km">0.00</span> | 🕒 <span id="estTime">0m</span></span>
         <span id="currentSpeedDisplay" style="color:#e74c3c;">0 km/h</span>
     </div>
-    <div id="townList">Draw Mode එක On කර රූට් එක හෝ නැවතුම් ලකුණු කරන්න...</div>
     
     <div style="display:flex; gap:5px;">
-        <button id="drawToggle" onclick="toggleDrawMode()" style="background:#555; color:white; width: 40%;">DRAW MODE: OFF</button>
-        <input type="text" id="routeName" placeholder="රූට් නම" style="margin-bottom:0; flex-grow:1;">
+        <button id="drawToggle" onclick="toggleDrawMode()" style="background:#555; color:white; width: 45%;">DRAW MODE</button>
+        <input type="text" id="routeName" placeholder="Route Name" style="margin-bottom:0;">
     </div>
 
     <div style="display:flex; gap:5px; margin-top:8px;">
         <button class="btn-main" id="startBtn" onclick="confirmRoute()">OK (START)</button>
         <button id="stopBtn" onclick="stopGhostDrive()" style="background:#c0392b; color:white; display:none;">STOP</button>
-        <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 20%;">CLR</button>
-        <button onclick="reCenter()" style="background:#3498db; color:white; width: 20%;">LOC</button>
+        <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 25%;">CLR</button>
     </div>
-    <div class="history-panel" id="historyList" style="font-size:10px; color:#ccc; padding:5px;">සම්බන්ධ වෙමින්...</div>
+
+    <h4 style="margin: 10px 0 5px 0; font-size: 12px; color: #888;">SAVED ROUTES</h4>
+    <div class="history-panel" id="historyList">Loading routes...</div>
+</div>
+
+<div id="menuOverlay" class="menu-overlay">
+    <button onclick="reCenter()" style="background:#3498db; color:white;">LOCATE ME (CENTER)</button>
+    <button onclick="map.zoomIn()" style="background:#444; color:white;">ZOOM IN (+)</button>
+    <button onclick="map.zoomOut()" style="background:#444; color:white;">ZOOM OUT (-)</button>
+    <button onclick="logout()" style="background:#c0392b; color:white; margin-top: 10px;">LOGOUT (EXIT)</button>
+    <button onclick="toggleMenu()" style="background:#777; color:white; margin-top: 5px;">CLOSE</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -60,22 +68,17 @@
 
 <script>
     const firebaseConfig = {
-        apiKey: "YOUR_FIREBASE_API_KEY",
-        authDomain: "cococoin-mine.firebaseapp.com",
-        databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
-        projectId: "cococoin-mine",
-        storageBucket: "cococoin-mine.appspot.com",
-        messagingSenderId: "717018135256",
-        appId: "location-38937"
+        apiKey: "YOUR_API_KEY",
+        databaseURL: "https://your-project-id.firebaseio.com",
+        projectId: "your-project-id"
     };
-
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline, driveLoop;
     let driverID = localStorage.getItem('driver_letter') || "";
     let routePoints = [], totalKm = 0, isGhosting = false, isDrawing = false;
-    let stopMarkers = [], totalWaitTime = 0, townNames = [];
+    let stopMarkers = [], totalWaitTime = 0;
     let otherMarkers = {}, lastRealPos = null;
 
     function initMap() {
@@ -91,21 +94,24 @@
             document.getElementById('dispID').innerText = driverID;
             initMap();
             initGPS();
-            listenToNetwork();
+            loadSavedRoutes();
         }
     };
+
+    function toggleMenu() {
+        const menu = document.getElementById('menuOverlay');
+        menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+    }
 
     function toggleDrawMode() {
         isDrawing = !isDrawing;
         const btn = document.getElementById('drawToggle');
-        btn.innerText = isDrawing ? "DRAW MODE: ON" : "DRAW MODE: OFF";
         btn.classList.toggle('active-draw', isDrawing);
+        btn.innerText = isDrawing ? "DRAWING ON" : "DRAW MODE";
     }
 
     function handleMapInteraction(e) {
         if(!isDrawing || isGhosting) return;
-        
-        // පාර දිගේ රූට් එක ගන්නවා
         let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
         
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
@@ -117,14 +123,10 @@
                 });
                 totalKm += data.routes[0].distance / 1000;
                 updateStats();
-                
-                // ඇඳපු තැන Stop එකක් දාන්න ඕනද අහනවා
-                if(confirm("මෙම ස්ථානය නැවතුමක් (Stop) ලෙස ලකුණු කරනවාද?")) {
-                    let mins = prompt("නැවතුම් කාලය (මිනිත්තු):", "10");
+                if(confirm("Add a STOP here?")) {
+                    let mins = prompt("Wait minutes:", "5");
                     if(mins) {
-                        L.marker(e.latlng, {
-                            icon: L.divIcon({className: 'stop-label', html: `STOP ${mins}m`})
-                        }).addTo(map);
+                        L.marker(e.latlng, {icon: L.divIcon({className: 'stop-label', html: `S:${mins}m`})}).addTo(map);
                         totalWaitTime += parseInt(mins);
                         updateStats();
                     }
@@ -134,27 +136,35 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න!");
+        if(routePoints.length < 2) return alert("Please draw a route first!");
+        let rName = document.getElementById('routeName').value || "Unnamed Route";
+        let rId = Date.now().toString();
+        
+        // Save to Firebase History
+        db.ref('shared_routes/' + rId).set({
+            id: rId, name: rName, points: routePoints, km: totalKm.toFixed(2), driver: driverID
+        });
+
+        startGhostDrive(routePoints);
+    }
+
+    function startGhostDrive(points) {
         isGhosting = true;
-        isDrawing = false;
-        document.getElementById('drawToggle').innerText = "DRAW MODE: OFF";
-        document.getElementById('drawToggle').classList.remove('active-draw');
-        document.getElementById('ghostStatus').style.display = 'block';
         document.getElementById('startBtn').style.display = 'none';
         document.getElementById('stopBtn').style.display = 'inline-block';
         
         let step = 0;
         driveLoop = setInterval(() => {
-            if(step < routePoints.length) {
-                let pos = routePoints[Math.floor(step)];
+            if(step < points.length) {
+                let pos = points[Math.floor(step)];
                 ghostMarker.setLatLng(pos);
-                updateFirebase(pos[0], pos[1], true, "GHOST");
-                document.getElementById('currentSpeedDisplay').innerText = `20 km/h`;
+                // ESP32 එකට බලපාන data path එක (fleet/ID)
+                db.ref('fleet/' + driverID).set({ lat: pos[0], lng: pos[1], status: "MOVING" });
+                document.getElementById('currentSpeedDisplay').innerText = `18 km/h`;
                 map.panTo(pos);
-                step += 0.4; // වේගය පාලනය (20kmh වගේ)
+                step += 0.3; // 15-20 kmh range speed
             } else {
                 stopGhostDrive();
-                alert("ගමන අවසන්!");
             }
         }, 500);
     }
@@ -162,59 +172,47 @@
     function stopGhostDrive() {
         clearInterval(driveLoop);
         isGhosting = false;
-        document.getElementById('ghostStatus').style.display = 'none';
         document.getElementById('startBtn').style.display = 'inline-block';
         document.getElementById('stopBtn').style.display = 'none';
-        document.getElementById('currentSpeedDisplay').innerText = `0 km/h`;
-        if(lastRealPos) updateFirebase(lastRealPos.lat, lastRealPos.lng, false, "REAL");
+        db.ref('fleet/' + driverID).update({ status: "STOPPED" });
     }
 
-    function updateStats() {
-        document.getElementById('km').innerText = totalKm.toFixed(2);
-        let travelTime = (totalKm / 20) * 60; 
-        document.getElementById('estTime').innerText = Math.round(travelTime + totalWaitTime) + "m";
+    function loadSavedRoutes() {
+        db.ref('shared_routes').on('value', (snap) => {
+            const list = document.getElementById('historyList');
+            list.innerHTML = "";
+            const data = snap.val(); if(!data) return;
+            Object.keys(data).forEach(id => {
+                let r = data[id];
+                let div = document.createElement('div');
+                div.className = "history-item";
+                div.innerHTML = `<span><b>${r.name}</b> (${r.km}km)</span>
+                                <div>
+                                    <button onclick="startGhostDrive(${JSON.stringify(r.points).replace(/"/g, '&quot;')})" style="width:auto; padding:2px 5px; background:#27ae60;">START</button>
+                                    <button onclick="deleteRoute('${r.id}')" style="width:auto; padding:2px 5px; background:#c0392b;">DEL</button>
+                                </div>`;
+                list.appendChild(div);
+            });
+        });
     }
 
-    // --- පරණ අත්‍යවශ්‍ය Function ටික (Firebase, GPS ආදිය) ---
+    function deleteRoute(id) { if(confirm("Delete this route?")) db.ref('shared_routes/' + id).remove(); }
+    function updateStats() { document.getElementById('km').innerText = totalKm.toFixed(2); document.getElementById('estTime').innerText = Math.round((totalKm/18)*60 + totalWaitTime) + "m"; }
     function initGPS() {
-        map.locate({setView: false, watch: true, enableHighAccuracy: true});
+        map.locate({setView: true, watch: true, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
             lastRealPos = e.latlng;
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db'}).addTo(map);
+                realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
-                map.setView(e.latlng, 15);
             }
             realMarker.setLatLng(e.latlng);
         });
     }
-
-    function updateFirebase(lat, lng, moving, mode) {
-        db.ref('fleet/' + driverID).set({ lat, lng, isMoving: moving, mode: mode, lastSeen: Date.now() });
-    }
-
-    function saveUser() {
-        let id = document.getElementById('uID').value.toUpperCase().trim();
-        if(!id) return;
-        localStorage.setItem('driver_letter', id);
-        location.reload();
-    }
-
-    function listenToNetwork() {
-        db.ref('shared_routes').on('value', (snap) => {
-            document.getElementById('historyList').innerHTML = "රූට් සොයාගන්නා ලදී.";
-        });
-    }
-
-    function clearRoute() {
-        if(isGhosting) return;
-        routePoints = []; polyline.setLatLngs([]); totalKm = 0; totalWaitTime = 0;
-        updateStats();
-        location.reload(); // සිතියමේ Stop markers අයින් කිරීමට ලේසිම ක්‍රමය
-    }
-
-    function reCenter() { if(lastRealPos) map.setView(lastRealPos, 15); }
+    function saveUser() { let id = document.getElementById('uID').value.toUpperCase().trim(); if(id) { localStorage.setItem('driver_letter', id); location.reload(); } }
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
+    function reCenter() { if(lastRealPos) { map.setView(lastRealPos, 15); toggleMenu(); } }
+    function clearRoute() { location.reload(); }
 </script>
 </body>
 </html>
