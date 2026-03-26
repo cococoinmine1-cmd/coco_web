@@ -1,203 +1,268 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>COCO Wallet | P2P & SOVEREIGN PROTOCOL</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;900&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ghost Driver - Smart Sync</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        :root { --gold: #f1c40f; --bg: #000; --card: #0d0d0d; --border: #1a1a1a; --green: #00ff88; --red: #ff4d4d; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-        body { background: var(--bg); color: white; font-family: 'Inter', sans-serif; margin: 0; overflow-x: hidden; }
-        .page { display: none; min-height: 100vh; width: 100vw; padding: 25px; }
-        .active { display: block; animation: fadeIn 0.4s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        h1, h2 { font-family: 'Orbitron'; color: var(--gold); text-align: center; letter-spacing: 3px; }
-        input { width: 100%; padding: 16px; background: #070707; border: 1px solid #1a1a1a; color: #fff; border-radius: 12px; margin-bottom: 12px; }
-        .btn { width: 100%; padding: 18px; border-radius: 15px; font-weight: 900; font-family: 'Orbitron'; border: none; cursor: pointer; margin-top: 10px; }
-        .btn-gold { background: var(--gold); color: #000; }
-        .btn-outline { background: transparent; border: 1px solid var(--gold); color: var(--gold); }
-        .asset-card { background: linear-gradient(145deg, #111, #000); border: 1px solid var(--border); border-radius: 30px; padding: 30px 15px; text-align: center; border-bottom: 4px solid var(--gold); margin-bottom: 20px; }
-        .p2p-card { background: #080808; border: 1px solid #111; border-radius: 20px; padding: 20px; margin-bottom: 15px; }
-        .badge { font-size: 10px; color: var(--gold); background: rgba(241,196,15,0.05); padding: 5px 12px; border-radius: 20px; border: 1px solid rgba(241,196,15,0.2); }
-        .policy-text { font-size: 13px; color: #777; line-height: 1.6; background: #050505; padding: 20px; border-radius: 15px; border: 1px solid #111; }
-        #pin-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.98); z-index:2000; padding:40px; text-align:center; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
+        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        #map { height: 100vh; width: 100%; background: #222; z-index: 1; }
+        
+        /* UI Elements */
+        .map-controls { position: absolute; top: 10px; left: 10px; z-index: 1000; width: calc(100% - 20px); pointer-events: none; }
+        .search-box { pointer-events: auto; display: flex; gap: 5px; background: rgba(31,31,31,0.9); padding: 8px; border-radius: 12px; }
+        .zoom-btns { position: absolute; top: 60px; right: 0; display: flex; flex-direction: column; gap: 5px; pointer-events: auto; }
+        .zoom-btns button { width: 40px; height: 40px; border-radius: 10px; background: #1f1f1f; color: white; border: 1px solid #444; }
+
+        .bottom-ui { position: fixed; bottom: 0; width: 100%; z-index: 1000; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
+        
+        #menuContent { display: none; margin-top: 10px; }
+        input, button { width: 100%; padding: 12px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
+        input { background: #333; color: white; border: 1px solid #444; }
+        
+        .btn-main { background: #27ae60; color: white; font-weight: bold; }
+        .btn-record { background: #e74c3c; color: white; font-weight: bold; }
+        .btn-menu { background: #34495e; color: white; font-weight: bold; }
+        
+        .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
+        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 150px; overflow-y: auto; border: 1px solid #333; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #222; font-size: 12px; }
+        .status-bar { font-size: 10px; text-align: center; display: none; padding: 5px; font-weight: bold; }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
-    <div id="pin-overlay">
-        <h2 id="pin-title">VERIFY PIN</h2>
-        <p id="pin-desc" style="color:#444; font-size:12px;">Enter 6-digit Transaction Key</p>
-        <input type="password" id="action-pin" maxlength="6" style="text-align:center; font-size:30px; letter-spacing:10px;">
-        <button class="btn btn-gold" id="confirm-action-btn">CONFIRM TRANSACTION</button>
-        <button class="btn btn-outline" onclick="closePin()">CANCEL</button>
-    </div>
+<div id="login-screen">
+    <h1 style="color: #27ae60;">Ghost Driver</h1>
+    <input type="text" id="uID" placeholder="වාහන අංකය (V1, V2...)">
+    <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
+</div>
 
-    <div id="auth-page" class="page active">
-        <div style="text-align:center; margin-top:60px;">
-            <h1>COCO Wallet</h1>
-            <p style="color:#333; font-size:10px; letter-spacing:2px;">MYSTERY SECURITY ACTIVE</p>
+<div class="map-controls">
+    <div class="search-box"><input type="text" id="searchInp" placeholder="Search Place..."><button onclick="searchPlace()" style="width:60px; background:#27ae60;">GO</button></div>
+    <div class="zoom-btns"><button onclick="map.zoomIn()">+</button><button onclick="map.zoomOut()">-</button></div>
+</div>
+
+<div id="map"></div>
+
+<div class="bottom-ui">
+    <div id="statusIndicator" class="status-bar"></div>
+    <div class="panel">
+        <div class="stats">
+            <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
+            <span>KM: <span id="km">0.00</span></span>
+            <span id="speedDisp" style="color:#e74c3c;">0 km/h</span>
         </div>
-        <div style="margin-top:40px;">
-            <input type="text" id="login-id" placeholder="Sovereign ID (e.g. COCO-1234)">
-            <input type="password" id="login-pass" placeholder="Access Key">
-            <button class="btn btn-gold" onclick="login()">ENTER Wallet</button>
-            <button class="btn btn-outline" onclick="showPage('reg-page')">CREATE IDENTITY</button>
-            <center style="margin-top:20px;"><a href="#" onclick="showPage('policy-page')" style="color:#333; font-size:12px; text-decoration:none;">Privacy Policy</a></center>
-        </div>
-    </div>
+        
+        <button class="btn-menu" onclick="toggleMenu()">☰ MENU / CONTROLS</button>
 
-    <div id="reg-page" class="page">
-        <h2>NEW IDENTITY</h2>
-        <input type="text" id="reg-name" placeholder="Full Name">
-        <input type="email" id="reg-email" placeholder="Email Address">
-        <input type="password" id="reg-pass" placeholder="Set Access Key">
-        <input type="password" id="reg-pin" placeholder="Set 6-Digit Transaction PIN" maxlength="6">
-        <button class="btn btn-gold" onclick="register()">REGISTER ID</button>
-        <button class="btn btn-outline" onclick="showPage('auth-page')">BACK</button>
-    </div>
-
-    <div id="dash-page" class="page">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <span class="badge" id="u-id">ID: COCO-XXXX</span>
-            <span onclick="logout()" style="cursor:pointer;">Logout 🚪</span>
-        </div>
-
-        <div class="asset-card">
-            <small style="color:#555; letter-spacing:2px;">Wallet BALANCE</small>
-            <div style="font-family:'Orbitron'; font-size:38px; margin:10px 0;" id="u-balance">0.00</div>
-            <span class="badge" style="color:var(--green); border-color:var(--green);">SECURED</span>
-        </div>
-
-        <div class="p2p-card">
-            <b style="color:var(--gold); font-family:'Orbitron'; font-size:12px;">P2P TRANSFER</b>
-            <input type="text" id="p2p-target" placeholder="Recipient COCO-ID" style="margin-top:10px; font-size:13px;">
-            <input type="number" id="p2p-amount" placeholder="Amount to Send" style="font-size:13px;">
-            <button class="btn-gold" style="padding:12px; font-size:11px; border-radius:10px; width:100%; border:none; font-weight:bold;" onclick="openPin('p2p')">SEND COCO</button>
-        </div>
-
-        <div class="p2p-card" style="border-style: dashed;">
-            <div style="display:flex; justify-content:space-between;">
-                <div><small style="color:#555;">MINING POINTS</small><br><b id="u-points" style="color:var(--green);">0 PTS</b></div>
-                <button class="btn-gold" style="padding:8px 15px; font-size:10px; border-radius:8px; border:none;" onclick="openPin('swap')">CONVERT</button>
+        <div id="menuContent">
+            <input type="text" id="routeName" placeholder="Route Name (eg: Colombo to Galle)">
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                <button class="btn-main" onclick="startGhostDrive()">START GHOST</button>
+                <button class="btn-record" id="recBtn" onclick="toggleRecording()">START RECORDING</button>
+                <button onclick="reCenter()" style="background:#3498db; color:white;">LOCATE ME</button>
+                <button onclick="clearRoute()" style="background:#e67e22; color:white;">CLEAR MAP</button>
+                <button onclick="saveRouteManual()" style="background:#f1c40f; color:black; grid-column: span 2;">SAVE CURRENT ROUTE</button>
             </div>
+            
+            <p style="font-size: 10px; margin: 5px 0;">SAVED ROUTES:</p>
+            <div class="history-panel" id="historyList">Loading...</div>
+            <button onclick="logout()" style="background:#c0392b; color:white; margin-top:10px;">LOGOUT</button>
         </div>
-
-        <button class="btn btn-outline" onclick="window.location.href='https://t.me/Cococoin_mining_bot'">🚀 TAPPING HUB</button>
-        <center style="margin-top:30px;"><a href="#" onclick="showPage('policy-page')" style="color:#222; font-size:10px;">Legal & Privacy Policy</a></center>
     </div>
+</div>
 
-    <div id="policy-page" class="page">
-        <h2>POLICIES</h2>
-        <div class="policy-text">
-            <b>1. P2P Transactions:</b> All transfers are final. The Mystery Security System encrypts every peer-to-peer movement. <br><br>
-            <b>2. Account Limits:</b> Minimum withdrawal is 10,000 COCO. Maximum daily transfer is 500,000 COCO. <br><br>
-            <b>3. Data Usage:</b> We do not share your private Access Keys. Your PIN is stored in a one-way encrypted hash.
-        </div>
-        <button class="btn btn-gold" onclick="showPage('auth-page')">I ACCEPT</button>
-    </div>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "cococoin-mine.firebaseapp.com",
+        databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
+        projectId: "cococoin-mine",
+        storageBucket: "cococoin-mine.appspot.com",
+        messagingSenderId: "717018135256",
+        appId: "location-38937"
+    };
 
-    <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyDE9SYe-4rS5jMeXStqg9pc_IuBsiySdaU",
-            databaseURL: "https://cococoin-mine-c7b27-default-rtdb.asia-southeast1.firebasedatabase.app/",
-            projectId: "cococoin-mine-c7b27"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-        let currentAction = '';
+    let map, realMarker, ghostMarker, polyline;
+    let driverID = localStorage.getItem('driver_letter') || "";
+    let routePoints = [], totalKm = 0, isGhosting = false, isRecording = false;
+    let otherMarkers = {}, lastPos = null;
 
-        function showPage(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
+    function initMap() {
+        map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
+        map.on('click', onMapClick);
+    }
+
+    window.onload = () => {
+        if(driverID) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dispID').innerText = driverID;
+            initMap();
+            initGPS();
+            listenToNetwork();
         }
+    };
 
-        function register() {
-            const name = document.getElementById('reg-name').value;
-            const email = document.getElementById('reg-email').value;
-            const pass = document.getElementById('reg-pass').value;
-            const pin = document.getElementById('reg-pin').value;
-            if(!name || !pass || pin.length < 6) return alert("Fill all fields correctly. PIN must be 6 digits.");
-            const nid = 'COCO-' + Math.floor(1000 + Math.random() * 8999);
-            db.ref('users/' + nid).set({ name, email, password: pass, pin, balance: 10, points: 5000 }).then(() => {
-                alert("Identity Created! Your ID: " + nid);
-                showPage('auth-page');
-            });
-        }
+    function initGPS() {
+        map.locate({watch: true, enableHighAccuracy: true});
+        map.on('locationfound', (e) => {
+            lastPos = e.latlng;
+            if(!realMarker) {
+                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db'}).addTo(map);
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
+                map.setView(e.latlng, 15);
+            }
+            realMarker.setLatLng(e.latlng);
 
-        function login() {
-            const id = document.getElementById('login-id').value.trim();
-            const pw = document.getElementById('login-pass').value.trim();
-            db.ref('users/' + id).once('value').then(s => {
-                const u = s.val();
-                if(u && u.password === pw) { 
-                    localStorage.setItem('c_user', id); // UNIFIED ID සෙට් කළා
-                    startDash(id); 
-                } else alert("Invalid ID or Access Key.");
-            });
-        }
+            if(isRecording) {
+                routePoints.push([e.latlng.lat, e.latlng.lng]);
+                polyline.addLatLng(e.latlng);
+                calculateDistance();
+            }
 
-        function startDash(id) {
-            document.getElementById('u-id').innerText = "ID: " + id;
-            db.ref('users/' + id).on('value', s => {
-                const d = s.val() || {};
-                document.getElementById('u-balance').innerText = (parseFloat(d.balance) || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-                document.getElementById('u-points').innerText = (parseFloat(d.points) || 0).toLocaleString() + " PTS";
-            });
-            showPage('dash-page');
-        }
+            if(!isGhosting) {
+                ghostMarker.setLatLng(e.latlng);
+                db.ref('fleet/' + driverID).update({ lat: e.latlng.lat, lng: e.latlng.lng, isMoving: isRecording });
+            }
+        });
+    }
 
-        function openPin(action) { 
-            currentAction = action; 
-            document.getElementById('pin-overlay').style.display = 'block';
-            document.getElementById('confirm-action-btn').onclick = currentAction === 'p2p' ? handleP2P : handleSwap;
-        }
-        function closePin() { document.getElementById('pin-overlay').style.display = 'none'; document.getElementById('action-pin').value = ''; }
-
-        function handleSwap() {
-            const id = localStorage.getItem('c_user');
-            const pin = document.getElementById('action-pin').value;
-            db.ref('users/' + id).once('value').then(s => {
-                const u = s.val();
-                if(u.pin !== pin) return alert("Wrong PIN");
-                if(u.points < 1000) return alert("Min 1000 PTS needed");
-                const coinsEarned = parseFloat(u.points) / 1000;
-                db.ref('users/' + id).runTransaction(currentData => {
-                    if (currentData) {
-                        currentData.balance = (parseFloat(currentData.balance) || 0) + coinsEarned;
-                        currentData.points = 0;
-                    }
-                    return currentData;
-                }).then(() => { alert("Converted Successfully!"); closePin(); });
-            });
-        }
-
-        function handleP2P() {
-            const myId = localStorage.getItem('c_user');
-            const toId = document.getElementById('p2p-target').value.trim();
-            const amt = parseFloat(document.getElementById('p2p-amount').value);
-            const pin = document.getElementById('action-pin').value;
-            if(!toId || isNaN(amt) || amt <= 0) return alert("Invalid entry");
-            db.ref('users/' + myId).once('value').then(ms => {
-                const me = ms.val();
-                if(me.pin !== pin) return alert("Wrong PIN");
-                if(parseFloat(me.balance) < amt) return alert("Insufficient Balance");
-                db.ref('users/' + toId).once('value').then(ts => {
-                    if(!ts.exists()) return alert("Recipient ID not found");
-                    db.ref('users/' + myId + '/balance').transaction(b => (parseFloat(b) || 0) - amt);
-                    db.ref('users/' + toId + '/balance').transaction(b => (parseFloat(b) || 0) + amt);
-                    alert("Transfer Successful!"); closePin();
+    function onMapClick(e) {
+        if(isGhosting || isRecording) return;
+        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastPos || e.latlng);
+        fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
+        .then(res => res.json()).then(data => {
+            if(data.routes) {
+                data.routes[0].geometry.coordinates.forEach(c => {
+                    routePoints.push([c[1], c[0]]);
+                    polyline.addLatLng([c[1], c[0]]);
                 });
-            });
-        }
+                calculateDistance();
+            }
+        });
+    }
 
-        function logout() { localStorage.clear(); location.reload(); }
-        window.onload = () => { if(localStorage.getItem('c_user')) startDash(localStorage.getItem('c_user')); };
-    </script>
+    function toggleRecording() {
+        if(!isRecording) {
+            isRecording = true;
+            routePoints = []; polyline.setLatLngs([]); 
+            document.getElementById('recBtn').innerText = "STOP & SAVE";
+            showStatus("🔴 RECORDING LIVE TRIP...", "#e74c3c");
+        } else {
+            isRecording = false;
+            document.getElementById('recBtn').innerText = "START RECORDING";
+            saveRouteManual();
+            showStatus("");
+        }
+    }
+
+    function startGhostDrive() {
+        if(routePoints.length < 2) return alert("පළමුව රූට් එකක් අඳින්න!");
+        isGhosting = true;
+        toggleMenu();
+        showStatus("👻 GHOST DRIVING ACTIVE", "#f1c40f");
+        let i = 0;
+        let driveInterval = setInterval(() => {
+            if(i < routePoints.length) {
+                let p = routePoints[Math.floor(i)];
+                ghostMarker.setLatLng(p);
+                db.ref('fleet/' + driverID).update({ lat: p[0], lng: p[1], isMoving: true });
+                map.panTo(p);
+                i += 0.5;
+            } else {
+                clearInterval(driveInterval);
+                isGhosting = false;
+                showStatus("");
+                alert("Ghost Drive අවසන්!");
+            }
+        }, 500);
+    }
+
+    function saveRouteManual() {
+        if(routePoints.length < 2) return alert("Save කිරීමට රූට් එකක් නැත!");
+        let name = document.getElementById('routeName').value || "New Route";
+        db.ref('shared_routes/' + Date.now()).set({
+            driver: driverID, name: name, km: totalKm.toFixed(2), points: routePoints
+        });
+        alert("රූට් එක සේව් වුණා!");
+    }
+
+    function calculateDistance() {
+        totalKm = 0;
+        for(let i=1; i<routePoints.length; i++) {
+            totalKm += L.latLng(routePoints[i-1]).distanceTo(L.latLng(routePoints[i])) / 1000;
+        }
+        document.getElementById('km').innerText = totalKm.toFixed(2);
+    }
+
+    function listenToNetwork() {
+        db.ref('fleet').on('value', snap => {
+            let data = snap.val();
+            for(let id in data) {
+                if(id !== driverID) {
+                    if(!otherMarkers[id]) otherMarkers[id] = L.marker([data[id].lat, data[id].lng]).addTo(map).bindTooltip(id);
+                    else otherMarkers[id].setLatLng([data[id].lat, data[id].lng]);
+                }
+            }
+        });
+        db.ref('shared_routes').on('value', snap => {
+            let list = document.getElementById('historyList');
+            list.innerHTML = "";
+            let data = snap.val();
+            for(let key in data) {
+                let r = data[key];
+                let div = document.createElement('div');
+                div.className = "history-item";
+                div.innerHTML = `<span><b>${r.name}</b> (${r.km}km)</span><button onclick="loadRoute('${key}')" style="width:auto; padding:5px; background:#27ae60; color:white;">LOAD</button>`;
+                list.appendChild(div);
+            }
+        });
+    }
+
+    window.loadRoute = (id) => {
+        db.ref('shared_routes/' + id).once('value', snap => {
+            let r = snap.val();
+            routePoints = r.points;
+            polyline.setLatLngs(routePoints);
+            calculateDistance();
+            map.fitBounds(polyline.getBounds());
+            toggleMenu();
+        });
+    }
+
+    function toggleMenu() {
+        let m = document.getElementById('menuContent');
+        m.style.display = m.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function showStatus(txt, col) {
+        let s = document.getElementById('statusIndicator');
+        if(!txt) { s.style.display = 'none'; return; }
+        s.innerText = txt; s.style.background = col; s.style.display = 'block';
+    }
+
+    function clearRoute() { routePoints = []; polyline.setLatLngs([]); document.getElementById('km').innerText = "0.00"; }
+    function searchPlace() {
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${document.getElementById('searchInp').value}`)
+        .then(r => r.json()).then(d => { if(d[0]) map.setView([d[0].lat, d[0].lon], 15); });
+    }
+    function saveUser() { localStorage.setItem('driver_letter', document.getElementById('uID').value.toUpperCase()); location.reload(); }
+    function logout() { localStorage.clear(); location.reload(); }
+    function reCenter() { if(lastPos) map.setView(lastPos, 15); }
+</script>
 </body>
 </html>
