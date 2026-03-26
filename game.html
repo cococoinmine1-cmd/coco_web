@@ -3,48 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver Pro - Dark Edition</title>
+    <title>Ghost Driver - Smart Sync Pro</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; overflow: hidden; }
-        #map { height: 100vh; width: 100%; background: #111; } /* Loading background */
-        .panel { position: fixed; bottom: 0; width: 100%; background: #1a1a1a; z-index: 1000; border-radius: 20px 20px 0 0; padding: 15px; box-sizing: border-box; border-top: 2px solid #2ecc71; box-shadow: 0 -5px 15px rgba(0,0,0,0.5); }
-        .stats { display: flex; justify-content: space-between; font-size: 11px; color: #2ecc71; margin-bottom: 10px; background: #000; padding: 10px; border-radius: 8px; border: 1px solid #333; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        button { padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
-        button:active { transform: scale(0.95); }
-        input { padding: 12px; background: #222; color: #fff; border: 1px solid #333; border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 8px; }
-        .btn-start { background: #27ae60; color: white; grid-column: span 2; font-size: 16px; margin-bottom: 5px; }
-        .btn-stop { background: #e67e22; color: white; }
-        .btn-clear { background: #c0392b; color: white; }
-        .btn-save { background: #2980b9; color: white; }
-        .status-float { position: absolute; top: -45px; left: 50%; transform: translateX(-50%); background: #f1c40f; color: #000; padding: 6px 25px; border-radius: 20px; font-weight: bold; display: none; z-index: 1001; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
+        #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        #map { height: 45vh; width: 100%; background: #222; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
+        input, button { width: 100%; padding: 12px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
+        input { background: #333; color: white; border: 1px solid #444; }
+        .btn-main { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 11px; flex-wrap: wrap; gap: 5px; }
+        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 100px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #222; cursor: pointer; }
+        .route-info { display: flex; flex-direction: column; font-size: 11px; }
+        .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 3px; font-weight: bold; margin-right: 5px; }
+        .km-label { color: #f1c40f; font-size: 10px; margin-top: 2px; }
+        .del-btn { background: #c0392b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
+        #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
+        .status-ghost { color: #f1c40f; font-size: 10px; text-align: center; display: none; }
+        .tracking-on { background: #e74c3c !important; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.6; } }
     </style>
 </head>
 <body>
 
-<div id="status" class="status-float">OFFLINE</div>
+<div id="login-screen">
+    <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
+    <input type="text" id="uID" placeholder="වාහන අංකය (V1, V2...)">
+    <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
+</div>
+
 <div id="map"></div>
-
 <div class="panel">
+    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE - REAL GPS PAUSED</div>
     <div class="stats">
-        <span>UNIT: <b id="dispID">-</b></span>
-        <span>DIST: <b id="km">0.00</b> KM</span>
-        <span>STOPS: <b id="totalStops">0</b> MIN</span>
+        <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
+        <span>KM: <span id="km">0.00</span></span>
+        <span>TIME: <span id="estTime" style="color:#f1c40f">0h 0m</span></span>
+        <span id="currentSpeedDisplay" style="color:#e74c3c;">0 km/h</span>
+    </div>
+    <div id="townList">Route: Left Click | Stops: Right Click</div>
+    
+    <div style="display:flex; gap:5px;">
+        <input type="text" id="routeName" placeholder="රූට් එකේ නම" style="margin-bottom: 5px;">
+        <button id="trackBtn" onclick="toggleTracking()" style="width: 40%; background: #444; color: white; font-size: 11px; margin-bottom: 5px;">START TRACK</button>
     </div>
 
-    <div style="display: flex; gap: 5px; margin-bottom: 8px;">
-        <input type="number" id="stopTime" placeholder="නැවතී සිටින කාලය (Min)" style="margin-bottom: 0;">
-        <button class="btn-stop" onclick="addStop()" style="width: 120px;">ADD STOP</button>
+    <div style="display:flex; gap:4px;">
+        <button class="btn-main" id="startBtn" onclick="confirmRoute()" style="font-size: 12px;">START GHOST</button>
+        <button onclick="reCenter()" style="background:#3498db; color:white; width: 20%; border-radius: 8px; font-size: 11px;">LOC</button>
+        <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 20%; border-radius: 8px; font-size: 11px;">CLR</button>
+        <button onclick="logout()" style="background:#c0392b; color:white; width: 20%; border-radius: 8px; font-size: 11px;">EXIT</button>
     </div>
-
-    <input type="text" id="routeName" placeholder="Route Name (eg: Colombo - Kandy)">
-
-    <div class="btn-grid">
-        <button class="btn-start" id="driveBtn" onclick="startGhost()">🚀 START GHOST DRIVE</button>
-        <button class="btn-save" onclick="saveRoute()">💾 SAVE ROUTE</button>
-        <button class="btn-clear" onclick="clearAll()">🧹 CLEAR MAP</button>
-    </div>
+    <div class="history-panel"><div id="historyList">සම්බන්ධ වෙමින්...</div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,107 +64,268 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <script>
-    // Firebase Config (Replace with yours)
-    const firebaseConfig = { apiKey: "YOUR_KEY", databaseURL: "YOUR_URL" };
-    if (firebaseConfig.apiKey !== "YOUR_KEY") firebase.initializeApp(firebaseConfig);
+    const firebaseConfig = {
+        apiKey: "YOUR_FIREBASE_API_KEY", 
+        authDomain: "cococoin-mine.firebaseapp.com",
+        databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
+        projectId: "cococoin-mine",
+        storageBucket: "cococoin-mine.appspot.com",
+        messagingSenderId: "717018135256",
+        appId: "location-38937"
+    };
 
-    let map, marker, polyline;
-    let routeData = []; 
-    let isGhosting = false;
-    let totalWait = 0;
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
 
-    let driverID = localStorage.getItem('unitID') || prompt("Enter Unit ID (V1-V10):") || "V-TEST";
-    localStorage.setItem('unitID', driverID);
-    document.getElementById('dispID').innerText = driverID;
+    let map, realMarker, ghostMarker, polyline;
+    let driverID = localStorage.getItem('driver_letter') || "";
+    let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
+    let otherMarkers = {};
+    let lastRealPos = null;
+    
+    // නව විචල්‍යයන්
+    let isTracking = false;
+    let stopMarkers = [];
+    let totalWaitMinutes = 0;
 
     function initMap() {
-        // මැප් එක හරියටම පේන්න මෙතන Dark Mode Tiles පාවිච්චි කරනවා
+        if (map) return;
         map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        polyline = L.polyline([], {color: '#f1c40f', weight: 5}).addTo(map);
         
-        // Dark Mode Map Tiles (රෑට පට්ටට පේනවා)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '©OpenStreetMap'
-        }).addTo(map);
-        
-        polyline = L.polyline([], {color: '#2ecc71', weight: 6, opacity: 0.9}).addTo(map);
-        marker = L.marker([0,0]).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
-
-        map.on('click', (e) => {
-            if(isGhosting) return;
-            let lastPoint = routeData.length > 0 ? routeData[routeData.length-1] : null;
-            let start = lastPoint ? `${lastPoint.lng},${lastPoint.lat}` : `${e.latlng.lng},${e.latlng.lat}`;
-            
-            fetch(`https://router.project-osrm.org/route/v1/driving/${start};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
-            .then(r => r.json()).then(data => {
-                if(data.routes && data.routes[0]) {
-                    data.routes[0].geometry.coordinates.forEach(c => {
-                        routeData.push({lat: c[1], lng: c[0], stop: 0});
-                        polyline.addLatLng([c[1], c[0]]);
-                    });
-                    let dist = parseFloat(document.getElementById('km').innerText) + (data.routes[0].distance / 1000);
-                    document.getElementById('km').innerText = dist.toFixed(2);
-                    map.panTo([e.latlng.lat, e.latlng.lng]);
-                }
-            }).catch(e => console.log("Map Error: Check Internet"));
-        });
+        map.on('click', onMapClick);
+        map.on('contextmenu', onMapRightClick); // Right click for STOPS
     }
 
-    function addStop() {
-        if(routeData.length === 0) return alert("මුලින් මැප් එකේ රූට් එකක් අඳින්න");
-        let mins = parseInt(document.getElementById('stopTime').value) || 0;
-        routeData[routeData.length-1].stop = mins;
-        totalWait += mins;
-        document.getElementById('totalStops').innerText = totalWait;
-        
-        L.circleMarker([routeData[routeData.length-1].lat, routeData[routeData.length-1].lng], 
-            {radius: 7, color: '#f39c12', fillOpacity: 1}).addTo(map).bindPopup("STOP: "+mins+" min").openPopup();
-        document.getElementById('stopTime').value = "";
-    }
-
-    async function startGhost() {
-        if(routeData.length < 2) return alert("රූට් එකක් නැත!");
-        isGhosting = true;
-        const statusDiv = document.getElementById('status');
-        statusDiv.style.display = "block";
-        document.getElementById('driveBtn').disabled = true;
-
-        for(let i=0; i<routeData.length; i++) {
-            if(!isGhosting) break;
-            let p = routeData[i];
-            marker.setLatLng([p.lat, p.lng]);
-            map.panTo([p.lat, p.lng]);
-
-            // ESP32 හෝ Firebase වෙත දත්ත යැවීමට මෙතන පාවිච්චි කරන්න
-            if(firebase.apps.length) {
-                firebase.database().ref('fleet/' + driverID).set({lat: p.lat, lng: p.lng, ts: Date.now()});
-            }
-
-            if(p.stop > 0) {
-                statusDiv.innerText = `🛑 STOPPED: ${p.stop} MIN`;
-                statusDiv.style.background = "#e67e22";
-                await new Promise(r => setTimeout(r, p.stop * 2000)); // Testing speed
-            } else {
-                statusDiv.innerText = "🚚 DRIVING...";
-                statusDiv.style.background = "#27ae60";
-                await new Promise(r => setTimeout(r, 600)); 
-            }
+    window.onload = function() {
+        if(driverID) {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dispID').innerText = driverID;
+            initMap();
+            initGPS();
+            listenToNetwork();
         }
-        isGhosting = false;
-        statusDiv.style.display = "none";
-        document.getElementById('driveBtn').disabled = false;
-        alert("ගමන අවසන්!");
-    }
+    };
 
-    function clearAll() {
+    function saveUser() {
+        let id = document.getElementById('uID').value.toUpperCase().trim();
+        if(!id) return;
+        localStorage.setItem('driver_letter', id);
         location.reload();
     }
 
-    function saveRoute() {
-        alert("Route Saved Locally!");
+    function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
+
+    function initGPS() {
+        map.locate({setView: false, watch: true, maxZoom: 16, enableHighAccuracy: true});
+        map.on('locationfound', (e) => {
+            lastRealPos = e.latlng;
+            if(!realMarker) {
+                realMarker = L.circleMarker(e.latlng, {radius: 8, color: '#3498db', fillOpacity: 0.5}).addTo(map);
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
+                map.setView(e.latlng, 15);
+            }
+            realMarker.setLatLng(e.latlng);
+
+            // ට්‍රැකින් ඔන් නම් පමණක් Firebase එකට යවයි
+            if(!isGhosting && isTracking) {
+                ghostMarker.setLatLng(e.latlng);
+                db.ref('fleet/' + driverID).set({
+                    lat: e.latlng.lat, 
+                    lng: e.latlng.lng, 
+                    isMoving: true,
+                    lastSeen: Date.now(),
+                    mode: "REAL_TRACKING"
+                });
+            }
+        });
     }
 
-    // මිනුත් මැප් එක ලෝඩ් කරන නිවැරදි විදිහ
-    window.onload = initMap;
+    function toggleTracking() {
+        isTracking = !isTracking;
+        const btn = document.getElementById('trackBtn');
+        if(isTracking) {
+            btn.innerText = "STOP TRACKING";
+            btn.classList.add('tracking-on');
+        } else {
+            btn.innerText = "START TRACKING";
+            btn.classList.remove('tracking-on');
+        }
+    }
+
+    function onMapClick(e) {
+        if(isGhosting) return;
+        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
+        fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
+        .then(res => res.json()).then(data => {
+            if(data.routes && data.routes.length > 0) {
+                data.routes[0].geometry.coordinates.forEach(c => {
+                    routePoints.push([c[1], c[0]]);
+                    polyline.addLatLng([c[1], c[0]]);
+                });
+                totalKm += data.routes[0].distance / 1000;
+                updateStats();
+                updateTownNames(e.latlng);
+            }
+        });
+    }
+
+    function onMapRightClick(e) {
+        if(isGhosting) return;
+        let wait = prompt("නැවතුම් කාලය (මිනිත්තු):", "10");
+        if(wait !== null) {
+            let m = L.marker(e.latlng, {
+                icon: L.divIcon({className: 'stop-icon', html: `<div style="background:#e74c3c; color:white; border-radius:50%; width:20px; height:20px; text-align:center; font-size:12px; font-weight:bold; border:2px solid white;">S</div>`})
+            }).addTo(map).bindPopup("Stop: " + wait + " mins");
+            stopMarkers.push({lat: e.latlng.lat, lng: e.latlng.lng, wait: parseInt(wait)});
+            totalWaitMinutes += parseInt(wait);
+            updateStats();
+        }
+    }
+
+    function updateStats() {
+        document.getElementById('km').innerText = totalKm.toFixed(2);
+        // උපකල්පිත වේගය 40km/h + නැවතුම් කාලය
+        let driveTimeMin = (totalKm / 40) * 60;
+        let totalMin = driveTimeMin + totalWaitMinutes;
+        let h = Math.floor(totalMin / 60);
+        let m = Math.floor(totalMin % 60);
+        document.getElementById('estTime').innerText = `${h}h ${m}m`;
+    }
+
+    function updateTownNames(latlng) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=14`)
+        .then(res => res.json()).then(data => {
+            let place = data.address.suburb || data.address.town || data.address.village || "Point";
+            if(!townNames.includes(place)) {
+                townNames.push(place);
+                document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
+            }
+        });
+    }
+
+    function confirmRoute() {
+        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න හෝ තෝරන්න!");
+        let rName = document.getElementById('routeName').value || "Quick Route";
+        let rId = Date.now().toString();
+        db.ref('shared_routes/' + rId).set({
+            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), 
+            points: routePoints, towns: townNames, stops: stopMarkers, 
+            duration: document.getElementById('estTime').innerText
+        });
+        startGhostDrive();
+    }
+
+    function startGhostDrive() {
+        isGhosting = true;
+        document.getElementById('ghostStatus').style.display = 'block';
+        if(realMarker) realMarker.setStyle({color: '#555', fillOpacity: 0.1});
+        
+        let i = 0;
+        const driveLoop = setInterval(() => {
+            if(i < routePoints.length) {
+                let currentPoint = routePoints[Math.floor(i)];
+                ghostMarker.setLatLng(currentPoint);
+                document.getElementById('currentSpeedDisplay').innerText = `45 km/h`;
+                
+                db.ref('fleet/' + driverID).update({ 
+                    lat: currentPoint[0], 
+                    lng: currentPoint[1], 
+                    isMoving: true,
+                    mode: "GHOST"
+                });
+                
+                map.panTo(currentPoint);
+                i += 0.5; 
+            } else {
+                clearInterval(driveLoop);
+                endGhostDrive();
+            }
+        }, 500); 
+    }
+
+    function endGhostDrive() {
+        isGhosting = false;
+        document.getElementById('ghostStatus').style.display = 'none';
+        document.getElementById('currentSpeedDisplay').innerText = `0 km/h`;
+        if(realMarker) realMarker.setStyle({color: '#3498db', fillOpacity: 0.5});
+        alert("ගමන අවසන්!");
+    }
+
+    function listenToNetwork() {
+        db.ref('fleet').on('value', (snap) => {
+            const data = snap.val(); if(!data) return;
+            Object.keys(data).forEach(id => {
+                if(id !== driverID) {
+                    let pos = data[id];
+                    if(!otherMarkers[id]) {
+                        otherMarkers[id] = L.marker([pos.lat, pos.lng], {
+                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white; white-space:nowrap;">${id}</div>`})
+                        }).addTo(map);
+                    } else { otherMarkers[id].setLatLng([pos.lat, pos.lng]); }
+                }
+            });
+        });
+
+        db.ref('shared_routes').on('value', (snap) => {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = "";
+            const data = snap.val(); if(!data) return;
+            Object.keys(data).reverse().forEach(key => {
+                let r = data[key];
+                let div = document.createElement('div');
+                div.className = "history-item";
+                div.onclick = () => loadRouteData(r.id);
+                div.innerHTML = `<div class="route-info">
+                                    <span><span class="badge">${r.driver}</span> <b>${r.name}</b></span>
+                                    <span class="km-label">📏 ${r.km} KM | 🕒 ${r.duration || 'N/A'}</span>
+                                 </div>
+                                 <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>`;
+                historyList.appendChild(div);
+            });
+        });
+    }
+
+    window.loadRouteData = function(id) {
+        if(isGhosting) return alert("දැනටමත් ගමනක් යනවා!");
+        db.ref('shared_routes/' + id).once('value', (snap) => {
+            let s = snap.val(); if(!s) return;
+            clearRoute();
+            routePoints = s.points;
+            polyline.setLatLngs(routePoints);
+            totalKm = parseFloat(s.km);
+            townNames = s.towns || [];
+            document.getElementById('km').innerText = s.km;
+            document.getElementById('estTime').innerText = s.duration || "0h 0m";
+            document.getElementById('townList').innerHTML = "📍 " + (townNames.join(" → "));
+            
+            if(s.stops) {
+                s.stops.forEach(st => {
+                    L.marker([st.lat, st.lng], {
+                        icon: L.divIcon({className: 'stop-icon', html: `<div style="background:#e74c3c; color:white; border-radius:50%; width:20px; height:20px; text-align:center; font-size:12px; font-weight:bold; border:2px solid white;">S</div>`})
+                    }).addTo(map).bindPopup("Stop: " + st.wait + " mins");
+                });
+            }
+            map.fitBounds(polyline.getBounds());
+        });
+    }
+
+    function reCenter() { 
+        let target = isGhosting ? ghostMarker.getLatLng() : realMarker.getLatLng();
+        if(target) map.setView(target, 15); 
+    }
+
+    window.deleteRoute = function(id) { if(confirm("මෙම රූට් එක මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
+    
+    function clearRoute() {
+        if(isGhosting) return;
+        routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = []; stopMarkers = []; totalWaitMinutes = 0;
+        document.getElementById('km').innerText = "0.00";
+        document.getElementById('estTime').innerText = "0h 0m";
+        document.getElementById('townList').innerText = "Route: Left Click | Stops: Right Click";
+        // Clear stop icons from map (re-init map elements if needed)
+    }
 </script>
 </body>
 </html>
