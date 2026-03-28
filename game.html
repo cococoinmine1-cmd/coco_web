@@ -3,75 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Ultra Sync</title>
+    <title>Ghost Driver - Pro Road Tracker</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 100vh; width: 100%; background: #222; position: absolute; top: 0; }
+        #map { height: 100vh; width: 100%; background: #222; position: absolute; }
         
-        /* Floating Controls on Map */
-        .map-overlay { position: absolute; z-index: 1000; pointer-events: none; width: 100%; height: 100%; }
-        .controls-top { position: absolute; top: 15px; left: 15px; pointer-events: auto; display: flex; flex-direction: column; gap: 8px; }
-        .controls-right { position: absolute; top: 15px; right: 15px; pointer-events: auto; display: flex; flex-direction: column; gap: 10px; }
-        .controls-bottom { position: absolute; bottom: 230px; left: 15px; right: 15px; pointer-events: auto; display: flex; gap: 8px; }
+        /* Floating UI */
+        .controls { position: absolute; z-index: 1000; pointer-events: none; width: 100%; height: 100%; }
+        .top-left { position: absolute; top: 15px; left: 15px; pointer-events: auto; display: flex; flex-direction: column; gap: 8px; }
+        .right-tools { position: absolute; top: 15px; right: 15px; pointer-events: auto; display: flex; flex-direction: column; gap: 10px; }
+        .bottom-actions { position: absolute; bottom: 230px; left: 15px; right: 15px; pointer-events: auto; display: flex; gap: 8px; flex-wrap: wrap; }
         
-        .m-btn { background: #1f1f1f; color: white; border: 1px solid #444; border-radius: 8px; padding: 10px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: auto; }
-        .btn-green { background: #27ae60 !important; border: none; }
-        .btn-red { background: #c0392b !important; border: none; }
-        .btn-blue { background: #3498db !important; border: none; }
-        .btn-orange { background: #e67e22 !important; border: none; }
-        
-        .draw-active { background: #f1c40f !important; color: black; }
+        .m-btn { background: #1f1f1f; color: white; border: 1px solid #444; border-radius: 8px; padding: 12px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: auto; font-size: 12px; }
+        .btn-green { background: #27ae60 !important; }
+        .btn-red { background: #c0392b !important; }
+        .btn-blue { background: #3498db !important; }
+        .btn-rec { background: #e74c3c !important; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
 
-        /* Bottom History Panel */
-        .panel { position: absolute; bottom: 0; width: 100%; height: 210px; background: #1a1a1a; border-radius: 20px 20px 0 0; z-index: 1001; padding: 15px; box-sizing: border-box; box-shadow: 0 -5px 20px rgba(0,0,0,0.6); }
-        .history-list { height: 100px; overflow-y: auto; background: #111; border-radius: 10px; padding: 5px; margin-top: 5px; border: 1px solid #333; }
+        /* Panel */
+        .panel { position: absolute; bottom: 0; width: 100%; height: 220px; background: #1a1a1a; border-radius: 20px 20px 0 0; z-index: 1001; padding: 15px; box-sizing: border-box; }
+        .history-list { height: 110px; overflow-y: auto; background: #111; border-radius: 10px; padding: 5px; border: 1px solid #333; margin-top: 5px; }
         .history-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #222; font-size: 11px; }
+        .stats-bar { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #2ecc71; margin-bottom: 10px; }
         
-        .stats-bar { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: #2ecc71; margin-bottom: 10px; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 5px; }
-        input { background: #333; color: white; border: 1px solid #444; padding: 8px; border-radius: 5px; width: 60%; }
-        
-        .zoom-btn { width: 45px; height: 45px; font-size: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50% !important; }
+        .zoom-btn { width: 45px; height: 45px; font-size: 20px; border-radius: 50% !important; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
 <div id="login-screen">
     <h1 style="color: #27ae60;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="Vehicle ID (e.g. V1)" style="width: 250px; margin-bottom: 10px;">
-    <button class="m-btn btn-green" onclick="saveUser()" style="width: 250px;">REGISTER</button>
+    <input type="text" id="uID" placeholder="Vehicle ID (V1, V2...)" style="width: 250px; padding: 10px; margin-bottom: 10px; border-radius: 8px;">
+    <button class="m-btn btn-green" onclick="saveUser()" style="width: 250px;">JOIN SYSTEM</button>
 </div>
 
 <div id="map"></div>
 
-<div class="map-overlay">
-    <div class="controls-top">
+<div class="controls">
+    <div class="top-left">
         <button id="drawBtn" class="m-btn" onclick="toggleDrawMode()">✏️ DRAW MODE: OFF</button>
-        <button class="m-btn btn-red" onclick="logout()">LOGOUT</button>
+        <button id="recBtn" class="m-btn" onclick="toggleRecording()">⏺️ REC ROUTE</button>
     </div>
 
-    <div class="controls-right">
+    <div class="right-tools">
         <button class="m-btn zoom-btn btn-blue" onclick="reCenter()">📍</button>
         <button class="m-btn zoom-btn" onclick="map.zoomIn()">+</button>
         <button class="m-btn zoom-btn" onclick="map.zoomOut()">-</button>
+        <button class="m-btn btn-red" onclick="logout()" style="font-size: 10px;">EXIT</button>
     </div>
 
-    <div class="controls-bottom">
-        <input type="text" id="routeName" placeholder="Route Name...">
-        <button id="startBtn" class="m-btn btn-green" onclick="confirmRoute()" style="flex-grow: 1;">OK (START)</button>
-        <button id="stopBtn" class="m-btn btn-red" onclick="stopGhostDrive()" style="display:none; flex-grow: 1;">STOP DRIVE</button>
-        <button class="m-btn btn-orange" onclick="clearRoute()">CLR</button>
+    <div class="bottom-actions">
+        <button id="startBtn" class="m-btn btn-green" onclick="confirmRoute()" style="flex: 2;">START GHOST</button>
+        <button id="stopBtn" class="m-btn btn-red" onclick="stopGhostDrive()" style="display:none; flex: 2;">STOP DRIVE</button>
+        <button class="m-btn btn-blue" onclick="clearRoute()" style="flex: 1;">CLR</button>
     </div>
 </div>
 
 <div class="panel">
     <div class="stats-bar">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
-        <span>KM: <span id="km">0.00</span> | 🕒 <span id="estTime">0m</span></span>
+        <span>KM: <span id="km">0.00</span></span>
         <span id="speedDisp" style="color:#e74c3c;">0 km/h</span>
     </div>
-    <div style="font-size: 11px; color: #888; margin-bottom: 5px;">SAVED ROUTES (HISTORY)</div>
+    <div style="font-size: 11px; color: #888;">SAVED ROUTES</div>
     <div class="history-list" id="historyList">Loading...</div>
 </div>
 
@@ -83,18 +80,18 @@
     const firebaseConfig = {
         apiKey: "YOUR_API_KEY",
         databaseURL: "https://your-db.firebaseio.com",
-        projectId: "your-id"
+        projectId: "your-project-id"
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     let map, realMarker, ghostMarker, polyline, driveLoop;
     let driverID = localStorage.getItem('driver_letter') || "";
-    let routePoints = [], totalKm = 0, isGhosting = false, isDrawing = false;
-    let lastRealPos = null;
+    let routePoints = [], isGhosting = false, isDrawing = false, isRecording = false;
+    let lastRealPos = null, currentKm = 0;
 
     function initMap() {
-        map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
+        map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         polyline = L.polyline([], {color: '#2ecc71', weight: 6}).addTo(map);
         map.on('click', handleMapInteraction);
@@ -110,17 +107,73 @@
         }
     };
 
+    function initGPS() {
+        map.locate({setView: true, watch: true, enableHighAccuracy: true});
+        map.on('locationfound', (e) => {
+            lastRealPos = e.latlng;
+            if(!realMarker) {
+                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db'}).addTo(map);
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
+            }
+            
+            // Ghost Mode එකේ නැතිනම් විතරක් Real Position එක Update කරනවා
+            if(!isGhosting) {
+                realMarker.setStyle({opacity: 1, fillOpacity: 0.5});
+                realMarker.setLatLng(e.latlng);
+                ghostMarker.setLatLng(e.latlng);
+                // තත්පරයකට වරක් ESP32 එකට data යවයි
+                updateFirebase(e.latlng.lat, e.latlng.lng, "REAL");
+            } else {
+                realMarker.setStyle({opacity: 0, fillOpacity: 0}); // Hide real GPS
+            }
+
+            // Recording On නම් පාර දිගේ Route එක අඳිනවා
+            if(isRecording) {
+                recordStep(e.latlng);
+            }
+        });
+    }
+
+    function toggleRecording() {
+        isRecording = !isRecording;
+        const btn = document.getElementById('recBtn');
+        if(isRecording) {
+            btn.classList.add('btn-rec');
+            btn.innerText = "🔴 RECORDING...";
+            routePoints = []; polyline.setLatLngs([]);
+        } else {
+            btn.classList.remove('btn-rec');
+            btn.innerText = "⏺️ REC ROUTE";
+            let name = prompt("රූට් එක සේව් කරන්න නමක් දෙන්න:", "Recorded Route");
+            if(name) saveRoute(name);
+        }
+    }
+
+    function recordStep(latlng) {
+        let last = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : latlng;
+        // පාර දිගේම record වෙන්න OSRM පාවිච්චි කරයි
+        fetch(`https://router.project-osrm.org/route/v1/driving/${last.lng},${last.lat};${latlng.lng},${latlng.lat}?overview=full&geometries=geojson`)
+        .then(res => res.json()).then(data => {
+            if(data.routes && data.routes.length > 0) {
+                data.routes[0].geometry.coordinates.forEach(c => {
+                    routePoints.push([c[1], c[0]]);
+                    polyline.addLatLng([c[1], c[0]]);
+                });
+                currentKm += data.routes[0].distance / 1000;
+                document.getElementById('km').innerText = currentKm.toFixed(2);
+            }
+        });
+    }
+
     function toggleDrawMode() {
         isDrawing = !isDrawing;
-        const btn = document.getElementById('drawBtn');
-        btn.innerText = isDrawing ? "✏️ DRAW MODE: ON" : "✏️ DRAW MODE: OFF";
-        btn.classList.toggle('draw-active', isDrawing);
+        document.getElementById('drawBtn').innerText = isDrawing ? "✏️ DRAW MODE: ON" : "✏️ DRAW MODE: OFF";
+        document.getElementById('drawBtn').style.background = isDrawing ? "#f1c40f" : "#1f1f1f";
     }
 
     function handleMapInteraction(e) {
         if(!isDrawing || isGhosting) return;
         let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
-        
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
@@ -128,21 +181,14 @@
                     routePoints.push([c[1], c[0]]);
                     polyline.addLatLng([c[1], c[0]]);
                 });
-                totalKm += data.routes[0].distance / 1000;
-                updateStats();
-                // Check for stop
-                if(confirm("මෙතන STOP එකක් ලකුණු කරනවාද?")) {
-                    L.marker(e.latlng, {icon: L.divIcon({className: 'stop-label', html: `<div style="background:red; color:white; padding:2px; font-size:9px; border-radius:3px;">STOP</div>`})}).addTo(map);
-                }
+                currentKm += data.routes[0].distance / 1000;
+                document.getElementById('km').innerText = currentKm.toFixed(2);
             }
         });
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර පාරක් අඳින්න!");
-        let rName = document.getElementById('routeName').value || "New Route";
-        let rId = Date.now().toString();
-        db.ref('shared_routes/' + rId).set({ id: rId, name: rName, points: routePoints, km: totalKm.toFixed(2), driver: driverID });
+        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න හෝ රෙකෝඩ් කරන්න!");
         startGhostDrive(routePoints);
     }
 
@@ -156,12 +202,12 @@
             if(step < points.length) {
                 let pos = points[Math.floor(step)];
                 ghostMarker.setLatLng(pos);
-                db.ref('fleet/' + driverID).set({ lat: pos[0], lng: pos[1], status: "MOVING" });
+                updateFirebase(pos[0], pos[1], "GHOST");
                 document.getElementById('speedDisp').innerText = `18 km/h`;
                 map.panTo(pos);
-                step += 0.3; // Speed 15-20kmh
+                step += 0.3; // Speed Sync
             } else { stopGhostDrive(); }
-        }, 500);
+        }, 1000); // 1 Second ESP32 Update Sync
     }
 
     function stopGhostDrive() {
@@ -169,8 +215,13 @@
         isGhosting = false;
         document.getElementById('startBtn').style.display = 'block';
         document.getElementById('stopBtn').style.display = 'none';
-        db.ref('fleet/' + driverID).update({ status: "STOPPED" });
         document.getElementById('speedDisp').innerText = `0 km/h`;
+        if(lastRealPos) updateFirebase(lastRealPos.lat, lastRealPos.lng, "REAL");
+    }
+
+    function saveRoute(name) {
+        let rId = Date.now().toString();
+        db.ref('shared_routes/' + rId).set({ id: rId, name: name, points: routePoints, km: currentKm.toFixed(2), driver: driverID });
     }
 
     function loadHistory() {
@@ -183,38 +234,23 @@
                 div.className = "history-item";
                 div.innerHTML = `<span><b>${r.name}</b> (${r.km}km)</span>
                                 <div>
-                                    <button class="m-btn btn-green" style="padding:4px 8px; font-size:10px;" onclick='startSavedRoute(${JSON.stringify(r.points)})'>START</button>
-                                    <button class="m-btn btn-red" style="padding:4px 8px; font-size:10px;" onclick="deleteRoute('${r.id}')">DEL</button>
+                                    <button class="m-btn btn-green" style="padding:4px; font-size:9px;" onclick='startGhostDrive(${JSON.stringify(r.points)})'>START</button>
+                                    <button class="m-btn btn-red" style="padding:4px; font-size:9px;" onclick="deleteRoute('${r.id}')">DEL</button>
                                 </div>`;
                 list.appendChild(div);
             });
         });
     }
 
-    window.startSavedRoute = function(pts) {
-        routePoints = pts;
-        polyline.setLatLngs(pts);
-        startGhostDrive(pts);
+    function updateFirebase(lat, lng, mode) {
+        db.ref('fleet/' + driverID).set({ lat, lng, mode, lastSeen: Date.now() });
     }
 
-    function initGPS() {
-        map.locate({setView: true, watch: true, enableHighAccuracy: true});
-        map.on('locationfound', (e) => {
-            lastRealPos = e.latlng;
-            if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 6, color: '#3498db'}).addTo(map);
-                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
-            }
-            realMarker.setLatLng(e.latlng);
-        });
-    }
-
-    function deleteRoute(id) { if(confirm("මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
-    function updateStats() { document.getElementById('km').innerText = totalKm.toFixed(2); document.getElementById('estTime').innerText = Math.round((totalKm/18)*60) + "m"; }
-    function saveUser() { let id = document.getElementById('uID').value.toUpperCase().trim(); if(id) { localStorage.setItem('driver_letter', id); location.reload(); } }
+    function deleteRoute(id) { if(confirm("Delete this?")) db.ref('shared_routes/' + id).remove(); }
     function logout() { localStorage.removeItem('driver_letter'); location.reload(); }
     function reCenter() { if(lastRealPos) map.setView(lastRealPos, 16); }
-    function clearRoute() { location.reload(); }
+    function clearRoute() { routePoints = []; polyline.setLatLngs([]); currentKm = 0; document.getElementById('km').innerText = "0.00"; }
+    function saveUser() { let id = document.getElementById('uID').value.toUpperCase().trim(); if(id) { localStorage.setItem('driver_letter', id); location.reload(); } }
 </script>
 </body>
 </html>
