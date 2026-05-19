@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Ultra Smooth Sync</title>
+    <title>Ghost Driver - Fast Sync</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -34,14 +34,14 @@
 
 <div id="map"></div>
 <div class="panel">
-    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE - SIMULATING ROUTE</div>
+    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE</div>
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
         <span style="color:#f1c40f;">⏱️ Time: <span id="duration">0m</span></span>
         <span id="currentSpeedDisplay" style="color:#e74c3c;">Speed: 0 km/h</span>
     </div>
-    <div id="townList">පාර අඳින්න සිතියම මත නැවතුම්පොළවල් ක්ලික් කරන්න...</div>
+    <div id="townList">පාර අඳින්න සිතියම මත ක්ලික් කරන්න...</div>
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
     <div style="display:flex; gap:5px;">
         <button class="btn-main" id="startBtn" onclick="confirmRoute()">OK (START)</button>
@@ -130,20 +130,6 @@
     }
 
     function listenToNetwork() {
-        db.ref('fleet').on('value', (snap) => {
-            const data = snap.val(); if(!data) return;
-            Object.keys(data).forEach(id => {
-                if(id !== driverID) {
-                    let pos = data[id];
-                    if(!otherMarkers[id]) {
-                        otherMarkers[id] = L.marker([pos.lat, pos.lng], {
-                            icon: L.divIcon({className: 'car', html: `<div style="background:${pos.isMoving ? '#27ae60' : '#e74c3c'}; color:white; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; border:1px solid white; white-space:nowrap;">${id}</div>`})
-                        }).addTo(map);
-                    } else { otherMarkers[id].setLatLng([pos.lat, pos.lng]); }
-                }
-            });
-        });
-
         db.ref('shared_routes').on('value', (snap) => {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = "";
@@ -155,36 +141,12 @@
                 div.onclick = () => loadRouteData(r.id);
                 div.innerHTML = `<div class="route-info">
                                     <span><span class="badge">${r.driver}</span> <b>${r.name}</b></span>
-                                    <span class="km-label">📏 ${r.km} KM | ⏱️ ${r.duration || '-'} | 📍 ${r.towns ? r.towns.length : 0} Stops</span>
+                                    <span class="km-label">📏 ${r.km} KM | ⏱️ ${r.duration || '-'}</span>
                                  </div>
                                  <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>`;
                 historyList.appendChild(div);
             });
         });
-    }
-
-    // ⚡ [SMOOTHING FUNCTION] පොයින්ට්ස් දෙකක් අතර දුර මීටර් 5 ට වඩා වැඩි නම් මැදින් පොයින්ට්ස් පුරවනවා
-    function interpolatePoints(p1, p2) {
-        let lat1 = p1[0], lon1 = p1[1];
-        let lat2 = p2[0], lon2 = p2[1];
-        
-        // සරල දුර ගණනය කිරීමක් (Approximate distance in meters)
-        let dLat = (lat2 - lat1) * 111000;
-        let dLon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180);
-        let distance = Math.sqrt(dLat * dLat + dLon * dLon);
-        
-        let steps = Math.floor(distance / 5); // හැම මීටර් 5කටම පොයින්ට් එකක්
-        let interpolated = [];
-        
-        if (steps > 1) {
-            for (let i = 1; i < steps; i++) {
-                let t = i / steps;
-                let nextLat = lat1 + (lat2 - lat1) * t;
-                let nextLon = lon1 + (lon2 - lon1) * t;
-                interpolated.push([nextLat, nextLon]);
-            }
-        }
-        return interpolated;
     }
 
     function onMapClick(e) {
@@ -198,23 +160,10 @@
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
-                let osrmCoords = data.routes[0].geometry.coordinates;
-                
-                osrmCoords.forEach((c, idx) => {
-                    let currentPt = [c[1], c[0]];
-                    
-                    if (routePoints.length > 0) {
-                        let lastPt = routePoints[routePoints.length - 1];
-                        // ⚡ Interpolate කරලා මැද පොයින්ට්ස් ටික එකතු කරනවා
-                        let extraPoints = interpolatePoints(lastPt, currentPt);
-                        extraPoints.forEach(ep => {
-                            routePoints.push(ep);
-                            polyline.addLatLng(ep);
-                        });
-                    }
-                    
-                    routePoints.push(currentPt);
-                    polyline.addLatLng(currentPt);
+                // ⚡ මුල් OSRM පොයින්ට්ස් විතරක් ගන්නවා (No Interpolation here to keep it light)
+                data.routes[0].geometry.coordinates.forEach(c => {
+                    routePoints.push([c[1], c[0]]);
+                    polyline.addLatLng([c[1], c[0]]);
                 });
 
                 totalKm += data.routes[0].distance / 1000;
@@ -229,10 +178,7 @@
 
     function calculateTravelTime(km, numStops) {
         let avgSpeed = 18; 
-        let driveHours = km / avgSpeed;
-        let driveMinutes = driveHours * 60;
-        let stopDelayMinutes = (numStops * 10) / 60;
-        let totalMinutes = Math.round(driveMinutes + stopDelayMinutes);
+        let totalMinutes = Math.round((km / avgSpeed) * 60 + (numStops * 10) / 60);
         let displayTime = totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes}m`;
         document.getElementById('duration').innerText = displayTime;
         return displayTime;
@@ -250,122 +196,28 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න හෝ තෝරන්න!");
-        
+        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න!");
         let rName = document.getElementById('routeName').value || "Quick Route";
         let rId = Date.now().toString();
-        let calculatedTime = calculateTravelTime(totalKm, stopIndexes.length);
+        
+        // ⚡ බෝඩ් එකට ඔරොත්තු දෙන විදිහට String එකක් විදිහට ඩේටා ටික සම්පීඩනය (Compress) කරනවා
+        let compressedPoints = "";
+        routePoints.forEach(p => { compressedPoints += p[0].toFixed(5) + "," + p[1].toFixed(5) + "|"; });
+        if(compressedPoints.endsWith("|")) compressedPoints = compressedPoints.slice(0, -1);
 
         db.ref('shared_routes/' + rId).set({
-            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), duration: calculatedTime, points: routePoints, towns: townNames, stops: stopIndexes
+            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), duration: calculateTravelTime(totalKm, stopIndexes.length), ptsStr: compressedPoints, stops: stopIndexes.join(",")
         });
 
-        startGhostDrive();
-    }
-
-    function startGhostDrive() {
-        isGhosting = true;
-        document.getElementById('ghostStatus').style.display = 'block';
-        if(realMarker) realMarker.setStyle({color: '#555', fillOpacity: 0.1});
-        
-        let i = 0;
-        let stopCounter = 0; 
-
-        const driveLoop = setInterval(() => {
-            if(i < routePoints.length) {
-                let idx = Math.floor(i);
-                
-                if(stopIndexes.includes(idx) && stopCounter < 20) {
-                    document.getElementById('currentSpeedDisplay').innerText = `🛑 Speed: 0 km/h (STOPPED)`;
-                    document.getElementById('ghostStatus').innerText = `👻 GHOST MODE ACTIVE - STOPPING AT STATION (${Math.round((20-stopCounter)/2)}s)`;
-                    
-                    db.ref('fleet/' + driverID).update({ 
-                        lat: routePoints[idx][0], lng: routePoints[idx][1], isMoving: false, mode: "GHOST_STOP"
-                    });
-                    
-                    stopCounter++; 
-                    return; 
-                }
-                
-                if(stopCounter >= 20) {
-                    stopCounter = 0;
-                    i += 1; 
-                }
-
-                let currentPoint = routePoints[idx];
-                ghostMarker.setLatLng(currentPoint);
-                
-                let simulatedSpeed = Math.floor(Math.random() * (25 - 10 + 1)) + 10;
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${simulatedSpeed} km/h`;
-                document.getElementById('ghostStatus').innerText = `👻 GHOST MODE ACTIVE - SIMULATING ROUTE`;
-                
-                db.ref('fleet/' + driverID).update({ 
-                    lat: currentPoint[0], lng: currentPoint[1], isMoving: true, mode: "GHOST"
-                });
-                
-                map.panTo(currentPoint);
-                
-                // ⚡ [STEP SIZE CONTROL] පාර උපරිම සුමටව ගලාගෙන යන්න දර්ශකය 1 බැගින් ඉදිරියට දමයි
-                i += 1; 
-            } else {
-                clearInterval(driveLoop);
-                endGhostDrive();
-            }
-        }, 500); 
-    }
-
-    function endGhostDrive() {
-        isGhosting = false;
-        document.getElementById('ghostStatus').style.display = 'none';
-        document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
-        if(realMarker) realMarker.setStyle({color: '#3498db', fillOpacity: 0.5});
-        alert("ගමන අවසන්! සැබෑ ලොකේෂන් එක ක්‍රියාත්මකයි.");
+        alert("රූට් එක සාර්ථකව Firebase දැම්මා! ESP32 එක දැන් බාගනීවි.");
         clearRoute();
-        
-        if(lastRealPos) {
-            ghostMarker.setLatLng(lastRealPos);
-            db.ref('fleet/' + driverID).update({ 
-                lat: lastRealPos.lat, lng: lastRealPos.lng, isMoving: false, mode: "REAL"
-            });
-        }
     }
 
-    window.loadRouteData = function(id) {
-        if(isGhosting) return alert("දැනටමත් ගමනක් යනවා!");
-        db.ref('shared_routes/' + id).once('value', (snap) => {
-            let s = snap.val(); if(!s) return;
-            clearRoute();
-            routePoints = s.points;
-            polyline.setLatLngs(routePoints);
-            totalKm = parseFloat(s.km);
-            townNames = s.towns || [];
-            stopIndexes = s.stops || [];
-            document.getElementById('km').innerText = s.km;
-            document.getElementById('duration').innerText = s.duration || "0m";
-            document.getElementById('townList').innerHTML = "📍 " + (townNames.length > 0 ? townNames.join(" → ") : "Loaded Route");
-            
-            stopIndexes.forEach(idx => {
-                if(routePoints[idx]) {
-                    let m = L.circleMarker(routePoints[idx], {radius: 6, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1}).addTo(map);
-                    stopMarkers.push(m);
-                }
-            });
-
-            map.fitBounds(polyline.getBounds());
-            alert(s.driver + " ගේ රූට් එක ලෝඩ් වුණා. OK ඔබලා ගමන අරඹන්න.");
-        });
-    }
-
-    window.deleteRoute = function(id) { if(confirm("මෙම රූට් එක මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
-    
     function clearRoute() {
-        if(isGhosting) return;
         routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = []; stopIndexes = [];
-        document.getElementById('km').innerText = "0.00";
-        document.getElementById('duration').innerText = "0m";
-        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම මත නැවතුම්පොළවල් ක්ලික් කරන්න...";
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
+        document.getElementById('km').innerText = "0.00"; document.getElementById('duration').innerText = "0m";
+        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම මත ක්ලික් කරන්න...";
+        stopMarkers.forEach(m => map.removeLayer(m)); stopMarkers = [];
     }
 </script>
 </body>
