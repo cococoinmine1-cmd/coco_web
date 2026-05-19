@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Smart Stop Sync</title>
+    <title>Ghost Driver - Ultra Smooth Sync</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -73,7 +73,7 @@
     let map, realMarker, ghostMarker, polyline;
     let driverID = localStorage.getItem('driver_letter') || "";
     let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
-    let stopIndexes = []; // නැවතුම් පොළවල් තියෙන තැන් වල array දර්ශක (Indexes) සේව් කරන්න
+    let stopIndexes = []; 
     let otherMarkers = {};
     let lastRealPos = null;
     let stopMarkers = []; 
@@ -163,6 +163,30 @@
         });
     }
 
+    // ⚡ [SMOOTHING FUNCTION] පොයින්ට්ස් දෙකක් අතර දුර මීටර් 5 ට වඩා වැඩි නම් මැදින් පොයින්ට්ස් පුරවනවා
+    function interpolatePoints(p1, p2) {
+        let lat1 = p1[0], lon1 = p1[1];
+        let lat2 = p2[0], lon2 = p2[1];
+        
+        // සරල දුර ගණනය කිරීමක් (Approximate distance in meters)
+        let dLat = (lat2 - lat1) * 111000;
+        let dLon = (lon2 - lon1) * 111000 * Math.cos(lat1 * Math.PI / 180);
+        let distance = Math.sqrt(dLat * dLat + dLon * dLon);
+        
+        let steps = Math.floor(distance / 5); // හැම මීටර් 5කටම පොයින්ට් එකක්
+        let interpolated = [];
+        
+        if (steps > 1) {
+            for (let i = 1; i < steps; i++) {
+                let t = i / steps;
+                let nextLat = lat1 + (lat2 - lat1) * t;
+                let nextLon = lon1 + (lon2 - lon1) * t;
+                interpolated.push([nextLat, nextLon]);
+            }
+        }
+        return interpolated;
+    }
+
     function onMapClick(e) {
         if(isGhosting) return;
         
@@ -174,32 +198,41 @@
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
-                data.routes[0].geometry.coordinates.forEach(c => {
-                    routePoints.push([c[1], c[0]]);
-                    polyline.addLatLng([c[1], c[0]]);
+                let osrmCoords = data.routes[0].geometry.coordinates;
+                
+                osrmCoords.forEach((c, idx) => {
+                    let currentPt = [c[1], c[0]];
+                    
+                    if (routePoints.length > 0) {
+                        let lastPt = routePoints[routePoints.length - 1];
+                        // ⚡ Interpolate කරලා මැද පොයින්ට්ස් ටික එකතු කරනවා
+                        let extraPoints = interpolatePoints(lastPt, currentPt);
+                        extraPoints.forEach(ep => {
+                            routePoints.push(ep);
+                            polyline.addLatLng(ep);
+                        });
+                    }
+                    
+                    routePoints.push(currentPt);
+                    polyline.addLatLng(currentPt);
                 });
+
                 totalKm += data.routes[0].distance / 1000;
                 document.getElementById('km').innerText = totalKm.toFixed(2);
                 
-                // දැනට තියෙන අන්තිම පොයින්ට් එක නැවතුමක් ලෙස සලකුණු කරගන්නවා
                 stopIndexes.push(routePoints.length - 1);
-                
                 calculateTravelTime(totalKm, stopIndexes.length);
                 updateTownNames(e.latlng);
             }
         });
     }
 
-    // ⏱️ ගතවන කාලය ගණනය කිරීම (පාරේ යන වෙලාව + නැවතුම් කාලය)
     function calculateTravelTime(km, numStops) {
         let avgSpeed = 18; 
         let driveHours = km / avgSpeed;
         let driveMinutes = driveHours * 60;
-        
-        // 🛑 [නැවතුම් කාලය] එක නැවතුමකට තත්පර 10 බැගින් විනාඩි වලට හරවා එකතු කරයි
         let stopDelayMinutes = (numStops * 10) / 60;
         let totalMinutes = Math.round(driveMinutes + stopDelayMinutes);
-        
         let displayTime = totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes}m`;
         document.getElementById('duration').innerText = displayTime;
         return displayTime;
@@ -217,7 +250,7 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර ਰූට් එකක් අඳින්න හෝ තෝරන්න!");
+        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න හෝ තෝරන්න!");
         
         let rName = document.getElementById('routeName').value || "Quick Route";
         let rId = Date.now().toString();
@@ -236,13 +269,12 @@
         if(realMarker) realMarker.setStyle({color: '#555', fillOpacity: 0.1});
         
         let i = 0;
-        let stopCounter = 0; // නැවතුම් තත්පර ගණන් කරන්න
+        let stopCounter = 0; 
 
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
                 let idx = Math.floor(i);
                 
-                // 🛑 [STOPPING LOGIC] මේ ලොකේෂන් එක නැවතුම්පොළක් නම් සහ තත්පර 10ක් (cycles 20ක්, 500ms බැගින්) තවම නැවතුනේ නැත්නම්
                 if(stopIndexes.includes(idx) && stopCounter < 20) {
                     document.getElementById('currentSpeedDisplay').innerText = `🛑 Speed: 0 km/h (STOPPED)`;
                     document.getElementById('ghostStatus').innerText = `👻 GHOST MODE ACTIVE - STOPPING AT STATION (${Math.round((20-stopCounter)/2)}s)`;
@@ -251,14 +283,12 @@
                         lat: routePoints[idx][0], lng: routePoints[idx][1], isMoving: false, mode: "GHOST_STOP"
                     });
                     
-                    stopCounter++; // එක තැන නවතින කාලය වැඩි කරයි
-                    return; // ඊළඟ පොයින්ට් එකට නොයා මෙතනින් නවතියි
+                    stopCounter++; 
+                    return; 
                 }
                 
-                // නැවතුම් කාලය ඉවර උනාම කවුන්ටරය රීසෙට් කරයි
                 if(stopCounter >= 20) {
                     stopCounter = 0;
-                    // අයිති නැවතුම මඟ හැර යාමට දර්ශකය පොඩ්ඩක් ඉස්සරහට දමයි
                     i += 1; 
                 }
 
@@ -274,7 +304,9 @@
                 });
                 
                 map.panTo(currentPoint);
-                i += 0.5; 
+                
+                // ⚡ [STEP SIZE CONTROL] පාර උපරිම සුමටව ගලාගෙන යන්න දර්ශකය 1 බැගින් ඉදිරියට දමයි
+                i += 1; 
             } else {
                 clearInterval(driveLoop);
                 endGhostDrive();
