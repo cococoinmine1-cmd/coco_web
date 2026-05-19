@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Smart Sync</title>
+    <title>Ghost Driver - Smart Stop Sync</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
         #login-screen { position: fixed; inset: 0; background: #1a1a1a; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #map { height: 48vh; width: 100%; background: #222; }
-        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); }
+        #map { height: 45vh; width: 100%; background: #222; }
+        .panel { padding: 15px; background: #1f1f1f; border-radius: 25px 25px 0 0; margin-top: -25px; position: relative; z-index: 1000; box-shadow: 0 -10px 20px rgba(0,0,0,0.5); height: 58vh; box-sizing: border-box; }
         input, button { width: 100%; padding: 12px; margin-bottom: 8px; border-radius: 8px; border: none; font-size: 14px; box-sizing: border-box; }
         input { background: #333; color: white; border: 1px solid #444; }
         .btn-main { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
-        .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; }
-        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 120px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 12px; background: #151515; padding: 8px; border-radius: 8px; }
+        .history-panel { background: #111; border-radius: 8px; padding: 8px; max-height: 100px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
         .history-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #222; cursor: pointer; }
         .route-info { display: flex; flex-direction: column; font-size: 11px; }
         .badge { background: #3498db; color: white; padding: 2px 5px; border-radius: 3px; font-weight: bold; margin-right: 5px; }
         .km-label { color: #f1c40f; font-size: 10px; margin-top: 2px; }
         .del-btn { background: #c0392b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; width: auto; margin: 0; }
         #townList { font-size: 11px; color: #f1c40f; height: 35px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
-        .status-ghost { color: #f1c40f; font-size: 10px; text-align: center; display: none; }
+        .status-ghost { background: #e67e22; color: white; font-size: 11px; font-weight: bold; text-align: center; display: none; padding: 5px; border-radius: 5px; margin-bottom: 5px; }
     </style>
 </head>
 <body>
@@ -34,13 +34,14 @@
 
 <div id="map"></div>
 <div class="panel">
-    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE - REAL GPS PAUSED</div>
+    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE - SIMULATING ROUTE</div>
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
+        <span style="color:#f1c40f;">⏱️ Time: <span id="duration">0m</span></span>
         <span id="currentSpeedDisplay" style="color:#e74c3c;">Speed: 0 km/h</span>
     </div>
-    <div id="townList">පාර අඳින්න සිතියම ක්ලික් කරන්න...</div>
+    <div id="townList">පාර අඳින්න සිතියම මත නැවතුම්පොළවල් ක්ලික් කරන්න...</div>
     <input type="text" id="routeName" placeholder="රූට් එකේ නම">
     <div style="display:flex; gap:5px;">
         <button class="btn-main" id="startBtn" onclick="confirmRoute()">OK (START)</button>
@@ -57,7 +58,7 @@
 
 <script>
     const firebaseConfig = {
-        apiKey: "AIzaSyDP01tcjB5AVJ4G8jUv6eY2scc7O0y27qA", // මෙතනට අනිවාර්යයෙන් API Key එක දාපන්
+        apiKey: "AIzaSyDP01tcjB5AVJ4G8jUv6eY2scc7O0y27qA", 
         authDomain: "cococoin-mine.firebaseapp.com",
         databaseURL: "https://cococoin-mine-default-rtdb.asia-southeast1.firebasedatabase.app/",
         projectId: "cococoin-mine",
@@ -72,8 +73,10 @@
     let map, realMarker, ghostMarker, polyline;
     let driverID = localStorage.getItem('driver_letter') || "";
     let routePoints = [], totalKm = 0, isGhosting = false, townNames = [];
+    let stopIndexes = []; // නැවතුම් පොළවල් තියෙන තැන් වල array දර්ශක (Indexes) සේව් කරන්න
     let otherMarkers = {};
     let lastRealPos = null;
+    let stopMarkers = []; 
 
     function initMap() {
         if (map) return;
@@ -111,18 +114,11 @@
                 ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
                 map.setView(e.latlng, 15);
             }
-            
             realMarker.setLatLng(e.latlng);
-
-            // GHOST MODE OFF නම් විතරක් Real Position එක Firebase එකට යවනවා
             if(!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 db.ref('fleet/' + driverID).set({
-                    lat: e.latlng.lat, 
-                    lng: e.latlng.lng, 
-                    isMoving: false,
-                    lastSeen: Date.now(),
-                    mode: "REAL"
+                    lat: e.latlng.lat, lng: e.latlng.lng, isMoving: false, lastSeen: Date.now(), mode: "REAL"
                 });
             }
         });
@@ -134,7 +130,6 @@
     }
 
     function listenToNetwork() {
-        // අනිත් ඔක්කොම වාහන සිතියමේ පෙන්වීම
         db.ref('fleet').on('value', (snap) => {
             const data = snap.val(); if(!data) return;
             Object.keys(data).forEach(id => {
@@ -149,7 +144,6 @@
             });
         });
 
-        // Shared Routes ලිස්ට් එක Update කිරීම
         db.ref('shared_routes').on('value', (snap) => {
             const historyList = document.getElementById('historyList');
             historyList.innerHTML = "";
@@ -161,7 +155,7 @@
                 div.onclick = () => loadRouteData(r.id);
                 div.innerHTML = `<div class="route-info">
                                     <span><span class="badge">${r.driver}</span> <b>${r.name}</b></span>
-                                    <span class="km-label">📏 ${r.km} KM | 📍 ${r.towns ? r.towns.length : 0} Towns</span>
+                                    <span class="km-label">📏 ${r.km} KM | ⏱️ ${r.duration || '-'} | 📍 ${r.towns ? r.towns.length : 0} Stops</span>
                                  </div>
                                  <button class="del-btn" onclick="event.stopPropagation(); deleteRoute('${r.id}')">DEL</button>`;
                 historyList.appendChild(div);
@@ -171,7 +165,12 @@
 
     function onMapClick(e) {
         if(isGhosting) return;
+        
+        let stopMarker = L.circleMarker(e.latlng, {radius: 6, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1}).addTo(map);
+        stopMarkers.push(stopMarker);
+
         let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
+        
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
@@ -181,15 +180,35 @@
                 });
                 totalKm += data.routes[0].distance / 1000;
                 document.getElementById('km').innerText = totalKm.toFixed(2);
+                
+                // දැනට තියෙන අන්තිම පොයින්ට් එක නැවතුමක් ලෙස සලකුණු කරගන්නවා
+                stopIndexes.push(routePoints.length - 1);
+                
+                calculateTravelTime(totalKm, stopIndexes.length);
                 updateTownNames(e.latlng);
             }
         });
     }
 
+    // ⏱️ ගතවන කාලය ගණනය කිරීම (පාරේ යන වෙලාව + නැවතුම් කාලය)
+    function calculateTravelTime(km, numStops) {
+        let avgSpeed = 18; 
+        let driveHours = km / avgSpeed;
+        let driveMinutes = driveHours * 60;
+        
+        // 🛑 [නැවතුම් කාලය] එක නැවතුමකට තත්පර 10 බැගින් විනාඩි වලට හරවා එකතු කරයි
+        let stopDelayMinutes = (numStops * 10) / 60;
+        let totalMinutes = Math.round(driveMinutes + stopDelayMinutes);
+        
+        let displayTime = totalMinutes >= 60 ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m` : `${totalMinutes}m`;
+        document.getElementById('duration').innerText = displayTime;
+        return displayTime;
+    }
+
     function updateTownNames(latlng) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=14`)
         .then(res => res.json()).then(data => {
-            let place = data.address.suburb || data.address.town || data.address.village || "Point";
+            let place = data.address.suburb || data.address.town || data.address.village || "Stop";
             if(!townNames.includes(place)) {
                 townNames.push(place);
                 document.getElementById('townList').innerHTML = "📍 " + townNames.join(" → ");
@@ -198,13 +217,14 @@
     }
 
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න හෝ තෝරන්න!");
+        if(routePoints.length < 2) return alert("කරුණාකර ਰූට් එකක් අඳින්න හෝ තෝරන්න!");
         
-        // රූට් එක Database එකට Save කරනවා (අනිත් අයටත් පේන්න)
         let rName = document.getElementById('routeName').value || "Quick Route";
         let rId = Date.now().toString();
+        let calculatedTime = calculateTravelTime(totalKm, stopIndexes.length);
+
         db.ref('shared_routes/' + rId).set({
-            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), points: routePoints, towns: townNames
+            id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), duration: calculatedTime, points: routePoints, towns: townNames, stops: stopIndexes
         });
 
         startGhostDrive();
@@ -216,22 +236,45 @@
         if(realMarker) realMarker.setStyle({color: '#555', fillOpacity: 0.1});
         
         let i = 0;
+        let stopCounter = 0; // නැවතුම් තත්පර ගණන් කරන්න
+
         const driveLoop = setInterval(() => {
             if(i < routePoints.length) {
-                let currentPoint = routePoints[Math.floor(i)];
-                ghostMarker.setLatLng(currentPoint);
-                document.getElementById('currentSpeedDisplay').innerText = `Speed: 45 km/h`;
+                let idx = Math.floor(i);
                 
-                // Firebase එකට යවන්නේ Virtual ලොකේෂන් එක
+                // 🛑 [STOPPING LOGIC] මේ ලොකේෂන් එක නැවතුම්පොළක් නම් සහ තත්පර 10ක් (cycles 20ක්, 500ms බැගින්) තවම නැවතුනේ නැත්නම්
+                if(stopIndexes.includes(idx) && stopCounter < 20) {
+                    document.getElementById('currentSpeedDisplay').innerText = `🛑 Speed: 0 km/h (STOPPED)`;
+                    document.getElementById('ghostStatus').innerText = `👻 GHOST MODE ACTIVE - STOPPING AT STATION (${Math.round((20-stopCounter)/2)}s)`;
+                    
+                    db.ref('fleet/' + driverID).update({ 
+                        lat: routePoints[idx][0], lng: routePoints[idx][1], isMoving: false, mode: "GHOST_STOP"
+                    });
+                    
+                    stopCounter++; // එක තැන නවතින කාලය වැඩි කරයි
+                    return; // ඊළඟ පොයින්ට් එකට නොයා මෙතනින් නවතියි
+                }
+                
+                // නැවතුම් කාලය ඉවර උනාම කවුන්ටරය රීසෙට් කරයි
+                if(stopCounter >= 20) {
+                    stopCounter = 0;
+                    // අයිති නැවතුම මඟ හැර යාමට දර්ශකය පොඩ්ඩක් ඉස්සරහට දමයි
+                    i += 1; 
+                }
+
+                let currentPoint = routePoints[idx];
+                ghostMarker.setLatLng(currentPoint);
+                
+                let simulatedSpeed = Math.floor(Math.random() * (25 - 10 + 1)) + 10;
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${simulatedSpeed} km/h`;
+                document.getElementById('ghostStatus').innerText = `👻 GHOST MODE ACTIVE - SIMULATING ROUTE`;
+                
                 db.ref('fleet/' + driverID).update({ 
-                    lat: currentPoint[0], 
-                    lng: currentPoint[1], 
-                    isMoving: true,
-                    mode: "GHOST"
+                    lat: currentPoint[0], lng: currentPoint[1], isMoving: true, mode: "GHOST"
                 });
                 
                 map.panTo(currentPoint);
-                i += 0.5; // ගමනාගමන වේගය පාලනයට
+                i += 0.5; 
             } else {
                 clearInterval(driveLoop);
                 endGhostDrive();
@@ -245,20 +288,16 @@
         document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
         if(realMarker) realMarker.setStyle({color: '#3498db', fillOpacity: 0.5});
         alert("ගමන අවසන්! සැබෑ ලොකේෂන් එක ක්‍රියාත්මකයි.");
+        clearRoute();
         
-        // ආයෙත් රියල් ලොකේෂන් එකට ස්විච් වෙනවා
         if(lastRealPos) {
             ghostMarker.setLatLng(lastRealPos);
             db.ref('fleet/' + driverID).update({ 
-                lat: lastRealPos.lat, 
-                lng: lastRealPos.lng, 
-                isMoving: false,
-                mode: "REAL"
+                lat: lastRealPos.lat, lng: lastRealPos.lng, isMoving: false, mode: "REAL"
             });
         }
     }
 
-    // තව කෙනෙක් ඇන්ද රූට් එකක් ලෝඩ් කරගැනීම
     window.loadRouteData = function(id) {
         if(isGhosting) return alert("දැනටමත් ගමනක් යනවා!");
         db.ref('shared_routes/' + id).once('value', (snap) => {
@@ -268,8 +307,18 @@
             polyline.setLatLngs(routePoints);
             totalKm = parseFloat(s.km);
             townNames = s.towns || [];
+            stopIndexes = s.stops || [];
             document.getElementById('km').innerText = s.km;
+            document.getElementById('duration').innerText = s.duration || "0m";
             document.getElementById('townList').innerHTML = "📍 " + (townNames.length > 0 ? townNames.join(" → ") : "Loaded Route");
+            
+            stopIndexes.forEach(idx => {
+                if(routePoints[idx]) {
+                    let m = L.circleMarker(routePoints[idx], {radius: 6, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1}).addTo(map);
+                    stopMarkers.push(m);
+                }
+            });
+
             map.fitBounds(polyline.getBounds());
             alert(s.driver + " ගේ රූට් එක ලෝඩ් වුණා. OK ඔබලා ගමන අරඹන්න.");
         });
@@ -279,9 +328,12 @@
     
     function clearRoute() {
         if(isGhosting) return;
-        routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = [];
+        routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = []; stopIndexes = [];
         document.getElementById('km').innerText = "0.00";
-        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම ක්ලික් කරන්න...";
+        document.getElementById('duration').innerText = "0m";
+        document.getElementById('townList').innerText = "පාර අඳින්න සිතියම මත නැවතුම්පොළවල් ක්ලික් කරන්න...";
+        stopMarkers.forEach(m => map.removeLayer(m));
+        stopMarkers = [];
     }
 </script>
 </body>
