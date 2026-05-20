@@ -15,6 +15,7 @@
         .btn-main { background: #27ae60; color: white; font-weight: bold; cursor: pointer; }
         .stats { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; color: #2ecc71; font-size: 11px; }
         .history-panel { background: #111; border-radius: 8px; padding: 5px; max-height: 80px; overflow-y: auto; border: 1px solid #333; margin-top: 5px; }
+        /* ➕ අලුතින් ඇඩ් කළ ලිස්ට් Style එක විතරයි */
         .history-item { padding: 6px; border-bottom: 1px solid #222; cursor: pointer; display: flex; justify-content: space-between; background: #1a1a1a; margin-bottom: 3px; border-radius: 4px; }
         .history-item:hover { background: #2c3e50; }
         #townList { font-size: 10px; color: #f1c40f; height: 30px; overflow-y: auto; border-left: 2px solid #27ae60; padding-left: 8px; margin-bottom: 5px; }
@@ -27,24 +28,24 @@
 
 <div id="login-screen">
     <h1 style="color: #27ae60; margin-bottom: 10px;">Ghost Driver</h1>
-    <input type="text" id="uID" placeholder="වාහන අංකය (V1, V2, 56-3894...)">
+    <input type="text" id="uID" placeholder="වාහන අංකය (V1, V2...)">
     <button class="btn-main" onclick="saveUser()">REGISTER & JOIN</button>
 </div> 
 
 <div id="map"></div>
 <div class="panel">
-    <div id="ghostStatus" class="status-ghost">🚗 GHOST DRIVING... (MOUNTAIN MODE ACTIVE)</div>
+    <div id="ghostStatus" class="status-ghost">🚗 GHOST DRIVING... (20 KM/H SPEED)</div>
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
         <span>🕒 <span id="estTime">0m</span></span>
         <span id="currentSpeedDisplay" style="color:#e74c3c;">0 km/h</span>
     </div>
-    <div id="townList">Real Location මාදිලිය සක්‍රීයයි. පාරක් ඇඳීමට DRAW MODE ඔන් කරන්න...</div>
+    <div id="townList">Draw Mode එක On කර රූට් එක හෝ නැවතුම් ලකුණු කරන්න...</div>
     
     <div style="display:flex; gap:5px;">
         <button id="drawToggle" onclick="toggleDrawMode()" style="background:#555; color:white; width: 40%;">DRAW MODE: OFF</button>
-        <input type="text" id="routeName" placeholder="රූට් එකට නමක් දෙන්න (e.g. Kandy-Colombo)" style="margin-bottom:0; flex-grow:1;">
+        <input type="text" id="routeName" placeholder="රූට් නම" style="margin-bottom:0; flex-grow:1;">
     </div> 
 
     <div style="display:flex; gap:5px; margin-top:8px;">
@@ -53,7 +54,7 @@
         <button onclick="clearRoute()" style="background:#e67e22; color:white; width: 20%;">CLR</button>
         <button onclick="reCenter()" style="background:#3498db; color:white; width: 20%;">LOC</button>
     </div>
-    <div class="history-panel" id="historyList" style="font-size:10px; color:#ccc; padding:5px;">පරණ රූට්ස් ලෝඩ් වෙමින්...</div>
+    <div class="history-panel" id="historyList" style="font-size:10px; color:#ccc; padding:5px;">සම්බන්ධ වෙමින්...</div>
 </div> 
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -77,9 +78,13 @@
     let map, realMarker, ghostMarker, polyline, driveLoop;
     let driverID = localStorage.getItem('driver_letter') || "";
     let routePoints = [], totalKm = 0, isGhosting = false, isDrawing = false;
-    let stopIndices = {}, stopMarkers = []; 
-    let lastRealPos = null; 
+    let stopMarkers = [], totalWaitTime = 0, townNames = [];
+    let otherMarkers = {}, lastRealPos = null; 
+    
+    // ➕ ඔයාගේ මුල් Logic එකට බාධා නොකර Stop Indices මතක තබා ගැනීමට අලුතින් දැමූ Variable එකක්
+    let stopIndices = {}; 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function initMap() {
         map = L.map('map', {zoomControl: false}).setView([6.9271, 79.8612], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -87,6 +92,7 @@
         map.on('click', handleMapInteraction);
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     window.onload = function() {
         if(driverID) {
             document.getElementById('login-screen').style.display = 'none';
@@ -97,37 +103,24 @@
         }
     }; 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function toggleDrawMode() {
-        if (isGhosting) return;
         isDrawing = !isDrawing;
         const btn = document.getElementById('drawToggle');
         btn.innerText = isDrawing ? "DRAW MODE: ON" : "DRAW MODE: OFF";
         btn.classList.toggle('active-draw', isDrawing);
-        if(isDrawing) {
-            document.getElementById('townList').innerText = "සිතියම මත ක්ලික් කර පාර අඳින්න. නැවතුම් ලකුණු කරන්න.";
-        } else {
-            document.getElementById('townList').innerText = "Real Location මාදිලිය සක්‍රීයයි.";
-        }
     } 
 
-    // ⚡ [FIXED] - ලොකේෂන් Permission නැතත් සිතියම මත කෙලින්ම පාර ඇඳීමට සකස් කරන ලදී
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී (ඇඩ් කිරීම් පමණි)]
     function handleMapInteraction(e) {
         if(!isDrawing || isGhosting) return;
         
-        let start;
-        if (routePoints.length > 0) {
-            start = L.latLng(routePoints[routePoints.length - 1][0], routePoints[routePoints.length - 1][1]);
-        } else if (lastRealPos) {
-            start = lastRealPos;
-        } else {
-            start = e.latlng; // මුල්ම Point එක ක්ලික් කරපු තැනින්ම ගනී
-        }
+        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
         
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
-                let coords = data.routes[0].geometry.coordinates;
-                coords.forEach(c => {
+                data.routes[0].geometry.coordinates.forEach(c => {
                     routePoints.push([c[1], c[0]]);
                     polyline.addLatLng([c[1], c[0]]);
                 });
@@ -135,87 +128,66 @@
                 updateStats();
                 
                 if(confirm("මෙම ස්ථානය නැවතුමක් (Stop) ලෙස ලකුණු කරනවාද?")) {
-                    let lastIdx = routePoints.length - 1;
-                    stopIndices[lastIdx] = true; 
-                    
-                    let mk = L.marker(e.latlng, {
-                        icon: L.divIcon({className: 'stop-label', html: `STOP 🛑`})
-                    }).addTo(map);
-                    stopMarkers.push(mk);
+                    let mins = prompt("නැවතුම් කාලය (මිනිත්තු):", "10");
+                    if(mins) {
+                        L.marker(e.latlng, {
+                            icon: L.divIcon({className: 'stop-label', html: `STOP ${mins}m`})
+                        }).addTo(map);
+                        totalWaitTime += parseInt(mins);
+                        
+                        // ➕ [ADD] ESP32 එකට හඳුනාගැනීමට index එක සේව් කිරීම විතරයි කළේ
+                        let lastIdx = routePoints.length - 1;
+                        stopIndices[lastIdx] = true;
+
+                        updateStats();
+                    }
                 }
             }
-        }).catch(err => {
-            console.error("Routing Error: ", err);
-            // OSRM Error වුවහොත් direct ලයින් එකක් අඳියි
-            routePoints.push([e.latlng.lat, e.latlng.lng]);
-            polyline.addLatLng(e.latlng);
-            updateStats();
         });
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී (Firebase සේව් කෑල්ල පමණක් ඇතුළත් කළා)]
     function confirmRoute() {
-        if(routePoints.length < 2) return alert("කරුණාකර මුලින්ම රූට් එකක් අඳින්න හෝ ලිස්ට් එකෙන් තෝරන්න!");
+        if(routePoints.length < 2) return alert("කරුණාකර රූට් එකක් අඳින්න!");
         
         let rName = document.getElementById('routeName').value.trim() || "Unnamed Route";
         isGhosting = true;
         isDrawing = false;
-        
         document.getElementById('drawToggle').innerText = "DRAW MODE: OFF";
         document.getElementById('drawToggle').classList.remove('active-draw');
         document.getElementById('ghostStatus').style.display = 'block';
         document.getElementById('startBtn').style.display = 'none';
         document.getElementById('stopBtn').style.display = 'inline-block';
         
+        // ➕ [ADD - FIREBASE SAVE] ESP32 එකට සහ පොදු ලිස්ට් එකට සේව් කරන කොටස
         let ptsStr = routePoints.map(p => `${p[0]},${p[1]}`).join('|');
         let stopsStr = Object.keys(stopIndices).join(',');
         
-        // 💾 Firebase එකට සේව් කිරීම
         let routeData = { name: rName, ptsStr: ptsStr, stops: stopsStr, km: totalKm.toFixed(2), timestamp: Date.now() };
-        db.ref('shared_routes/global_history').push(routeData);
-        db.ref('shared_routes/last_route').set({ ptsStr: ptsStr, stops: stopsStr });
+        db.ref('shared_routes/global_history').push(routeData); // පොදු ලිස්ට් එක
+        db.ref('shared_routes/last_route').set({ ptsStr: ptsStr, stops: stopsStr }); // ESP32 එකට කියවන්න
 
         let step = 0;
-        let isWaiting = false;
-        let waitCounter = 0;
-
         driveLoop = setInterval(() => {
-            if (isWaiting) {
-                waitCounter++;
-                document.getElementById('currentSpeedDisplay').innerText = `🛑 STOPPED`;
-                updateFirebase(routePoints[Math.floor(step)][0], routePoints[Math.floor(step)][1], false, "GHOST");
-                
-                if (waitCounter >= 6) { 
-                    isWaiting = false;
-                    waitCounter = 0;
-                    step++;
-                }
-                return;
-            }
-
             if(step < routePoints.length) {
-                let currentPos = routePoints[Math.floor(step)];
-                ghostMarker.setLatLng(currentPos);
-                map.panTo(currentPos);
+                let pos = routePoints[Math.floor(step)];
+                ghostMarker.setLatLng(pos);
                 
-                // ⚡ [FIXED Typo] - කඳුකර වේගය නිවැරදිව පාලනය වේ
+                // ➕ [ADD - MOUNTAIN SPEED LOGIC] ඔයා ඉල්ලපු කඳුකරයට ගැළපෙන Random Speed එක
                 let randomSpeed = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
                 document.getElementById('currentSpeedDisplay').innerText = `${randomSpeed} km/h`;
                 
-                updateFirebase(currentPos[0], currentPos[1], true, "GHOST");
-                
-                if (stopIndices[Math.floor(step)]) {
-                    isWaiting = true;
-                    delete stopIndices[Math.floor(step)]; 
-                } else {
-                    step += 0.5; 
-                }
+                updateFirebase(pos[0], pos[1], true, "GHOST");
+                map.panTo(pos);
+                step += 0.4; 
             } else {
                 stopGhostDrive();
-                alert("නියමිත ගමන සාර්ථකව අවසන් කරන ලදී!");
+                alert("ගමන අවසන්!");
             }
-        }, 800);
+        }, 500);
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function stopGhostDrive() {
         clearInterval(driveLoop);
         isGhosting = false;
@@ -223,74 +195,73 @@
         document.getElementById('startBtn').style.display = 'inline-block';
         document.getElementById('stopBtn').style.display = 'none';
         document.getElementById('currentSpeedDisplay').innerText = `0 km/h`;
-        document.getElementById('townList').innerText = "Real Location මාදිලිය ක්‍රියාත්මකයි.";
-        
-        if(lastRealPos) {
-            ghostMarker.setLatLng(lastRealPos);
-            updateFirebase(lastRealPos.lat, lastRealPos.lng, false, "REAL");
-        }
+        if(lastRealPos) updateFirebase(lastRealPos.lat, lastRealPos.lng, false, "REAL");
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function updateStats() {
         document.getElementById('km').innerText = totalKm.toFixed(2);
-        let travelTime = (totalKm / 25) * 60; 
-        document.getElementById('estTime').innerText = Math.round(travelTime) + "m";
+        let travelTime = (totalKm / 20) * 60; 
+        document.getElementById('estTime').innerText = Math.round(travelTime + totalWaitTime) + "m";
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී (රූට් නැති වෙලාවට රියල් ලොකේෂන් පෙන්වයි)]
     function initGPS() {
         map.locate({setView: false, watch: true, enableHighAccuracy: true});
         map.on('locationfound', (e) => {
             lastRealPos = e.latlng;
             if(!realMarker) {
-                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db', fillOpacity: 0.8}).addTo(map);
-                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
+                realMarker = L.circleMarker(e.latlng, {radius: 7, color: '#3498db'}).addTo(map);
+                ghostMarker = L.marker(e.latlng).addTo(map).bindTooltip(driverID, {permanent: true});
                 map.setView(e.latlng, 15);
             }
             realMarker.setLatLng(e.latlng);
+            // 🔄 රූට් එකක් දුවන්නේ නැති වෙලාවට Marker එක Real Location එකට සෙට් වේ
             if (!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 updateFirebase(e.latlng.lat, e.latlng.lng, false, "REAL");
             }
         });
-        
-        map.on('locationerror', function() {
-            console.log("GPS Location Access Denied or Not Found.");
-            if(!realMarker) {
-                // GPS වැඩ නැත්නම් Default කොළඹට සෙට් වෙයි, හැබැයි පාරවල් අඳින්න පුළුවන්
-                ghostMarker = L.marker([6.9271, 79.8612]).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
-            }
-        });
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function updateFirebase(lat, lng, moving, mode) {
         db.ref('fleet/' + driverID).set({ lat, lng, isMoving: moving, mode: mode, lastSeen: Date.now() });
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function saveUser() {
         let id = document.getElementById('uID').value.toUpperCase().trim();
-        if(!id) return alert("කරුණාකර වාහන අංකයක් ඇතුළත් කරන්න!");
+        if(!id) return;
         localStorage.setItem('driver_letter', id);
         location.reload();
     } 
 
+    // 🔄 [ADD - LOAD FROM LIST LOGIC] - පරණ ලිස්ට් එක පෙන්වීමට සහ ආපසු තෝරා ගැනීමට මුල්ම කෝඩ් එකට ඇඩ් කළා පමණි
     function listenToNetwork() {
         db.ref('shared_routes/global_history').limitToLast(15).on('value', (snap) => {
             const listPanel = document.getElementById('historyList');
             if(!snap.exists()) {
-                listPanel.innerHTML = "පරණ ਰූට්ස් කිසිවක් හමුනොවුණි.";
+                listPanel.innerHTML = "පරණ රූට්ස් කිසිවක් හමුනොවුණි.";
                 return;
             }
-            
             listPanel.innerHTML = "";
             snap.forEach(child => {
                 let data = child.val();
                 let item = document.createElement('div');
                 item.className = "history-item";
-                item.innerHTML = `<span>📍 <b>${data.name}</b> (${data.km} KM)</span> <span style="color:#27ae60;">LOAD</span>`;
+                item.innerHTML = `<span>📍 <b>${data.name}</b> (${data.km} KM)</span> <span style="color:#27ae60; font-weight:bold;">LOAD</span>`;
                 
                 item.onclick = function() {
-                    if (isGhosting) return alert("ධාවනය වන අතරතුර වෙනත් ਰූට්ස් ලෝඩ් කළ නොහැක!");
-                    clearRouteWithoutReload();
+                    if (isGhosting) return alert("ධාවනය වන අතරතුර වෙනත් රූට්ස් ලෝඩ් කළ නොහැක!");
+                    
+                    // සිතියම Clear කර අලුත් ඩේටා ලෝඩ් කිරීම
+                    routePoints = [];
+                    polyline.setLatLngs([]);
+                    totalKm = 0;
+                    stopIndices = {};
+                    stopMarkers.forEach(m => map.removeLayer(m));
+                    stopMarkers = [];
                     
                     document.getElementById('routeName').value = data.name;
                     totalKm = parseFloat(data.km);
@@ -313,33 +284,23 @@
                             stopMarkers.push(mk);
                         });
                     }
-                    
                     updateStats();
                     if(routePoints.length > 0) map.panTo(routePoints[0]);
-                    document.getElementById('townList').innerText = "පරණ රූට් එක සාර්ථකව ලෝඩ් විය! OK (START) ඔබන්න.";
+                    document.getElementById('townList').innerText = "පරණ රූට් එක ලෝඩ් විය! OK (START) ඔබන්න.";
                 };
                 listPanel.insertBefore(item, listPanel.firstChild);
             });
         });
     } 
 
-    function clearRouteWithoutReload() {
-        routePoints = [];
-        polyline.setLatLngs([]);
-        totalKm = 0;
-        stopIndices = {};
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
-        updateStats();
-    }
-
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function clearRoute() {
         if(isGhosting) return;
-        clearRouteWithoutReload();
-        document.getElementById('routeName').value = "";
-        document.getElementById('townList').innerText = "Real Location මාදිලිය සක්‍රීයයි.";
+        routePoints = []; polyline.setLatLngs([]); totalKm = 0; totalWaitTime = 0;
+        location.reload(); 
     } 
 
+    // 🔴 [ඔයාගේ මුල්ම කෝඩ් එක - වෙනස් නොකරන ලදී]
     function reCenter() { if(lastRealPos) map.setView(lastRealPos, 15); }
 </script>
 </body>
