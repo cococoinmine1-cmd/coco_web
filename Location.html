@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ghost Driver - Fast Sync</title>
+    <title>Ghost Driver - Sync & Simulate</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #121212; color: white; overflow: hidden; }
@@ -34,7 +34,7 @@
 
 <div id="map"></div>
 <div class="panel">
-    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE</div>
+    <div id="ghostStatus" class="status-ghost">👻 GHOST MODE ACTIVE - SIMULATING ON WEB</div>
     <div class="stats">
         <span>ID: <span id="dispID" style="color:#3498db">-</span></span>
         <span>KM: <span id="km">0.00</span></span>
@@ -77,6 +77,7 @@
     let otherMarkers = {};
     let lastRealPos = null;
     let stopMarkers = []; 
+    let driveLoop = null;
 
     function initMap() {
         if (map) return;
@@ -160,7 +161,6 @@
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
             if(data.routes && data.routes.length > 0) {
-                // ⚡ මුල් OSRM පොයින්ට්ස් විතරක් ගන්නවා (No Interpolation here to keep it light)
                 data.routes[0].geometry.coordinates.forEach(c => {
                     routePoints.push([c[1], c[0]]);
                     polyline.addLatLng([c[1], c[0]]);
@@ -200,7 +200,7 @@
         let rName = document.getElementById('routeName').value || "Quick Route";
         let rId = Date.now().toString();
         
-        // ⚡ බෝඩ් එකට ඔරොත්තු දෙන විදිහට String එකක් විදිහට ඩේටා ටික සම්පීඩනය (Compress) කරනවා
+        // ESP32 එකට බෆර් නොවෙන්න ඩේටා ටික සම්පීඩනය කරලා යවනවා
         let compressedPoints = "";
         routePoints.forEach(p => { compressedPoints += p[0].toFixed(5) + "," + p[1].toFixed(5) + "|"; });
         if(compressedPoints.endsWith("|")) compressedPoints = compressedPoints.slice(0, -1);
@@ -209,11 +209,97 @@
             id: rId, driver: driverID, name: rName, km: totalKm.toFixed(2), duration: calculateTravelTime(totalKm, stopIndexes.length), ptsStr: compressedPoints, stops: stopIndexes.join(",")
         });
 
-        alert("රූට් එක සාර්ථකව Firebase දැම්මා! ESP32 එක දැන් බාගනීවි.");
-        clearRoute();
+        // ⚡ මෙතනදී අපි වෙබ් එකේ වාහනය දුවන ඇනිමේෂන් එක ස්ටාර්ට් කරනවා මචං
+        startWebSimulation();
     }
 
+    // ⚡ [NEW] වෙබ් සිතියම මත වාහනය ධාවනය කරවන කොටස
+    function startWebSimulation() {
+        if(routePoints.length === 0) return;
+        isGhosting = true;
+        document.getElementById('ghostStatus').style.display = 'block';
+        if(realMarker) realMarker.setStyle({color: '#555', fillOpacity: 0.1});
+
+        let i = 0;
+        let stopCounter = 0;
+
+        driveLoop = setInterval(() => {
+            if(i < routePoints.length) {
+                // නැවතුම්පොළකදී තත්පර කිහිපයක් වෙබ් එකෙත් නවත්තනවා
+                if(stopIndexes.includes(i) && stopCounter < 10) {
+                    document.getElementById('currentSpeedDisplay').innerText = `🛑 Speed: 0 km/h`;
+                    document.getElementById('ghostStatus').innerText = `👻 STOPPED AT STATION (${10 - stopCounter}s)`;
+                    stopCounter++;
+                    return;
+                }
+
+                if(stopCounter >= 10) stopCounter = 0;
+
+                let currentPt = routePoints[i];
+                ghostMarker.setLatLng(currentPt);
+                map.panTo(currentPt);
+
+                let randSpeed = Math.floor(Math.random() * (25 - 10 + 1)) + 10;
+                document.getElementById('currentSpeedDisplay').innerText = `Speed: ${randSpeed} km/h`;
+                document.getElementById('ghostStatus').innerText = `👻 GHOST MODE ACTIVE - SIMULATING`;
+
+                i++;
+            } else {
+                clearInterval(driveLoop);
+                endWebSimulation();
+            }
+        }, 800); // ධාවනය වන වේගය පාලනය (මිලි තත්පර 800න් 800ට ඊළඟ පොයින්ට් එකට යයි)
+    }
+
+    function endWebSimulation() {
+        isGhosting = false;
+        document.getElementById('ghostStatus').style.display = 'none';
+        document.getElementById('currentSpeedDisplay').innerText = `Speed: 0 km/h`;
+        if(realMarker) realMarker.setStyle({color: '#3498db', fillOpacity: 0.5});
+        alert("වෙබ් සිමියුලේෂන් එක අවසන්!");
+        clearRoute();
+        if(lastRealPos) ghostMarker.setLatLng(lastRealPos);
+    }
+
+    window.loadRouteData = function(id) {
+        if(isGhosting) return alert("දැනටමත් ගමනක් යනවා!");
+        db.ref('shared_routes/' + id).once('value', (snap) => {
+            let s = snap.val(); if(!s) return;
+            clearRoute();
+            
+            // සේව් කරපු String එක ආපහු පොයින්ට්ස් Array එකකට හරවනවා
+            let pts = s.ptsStr.split('|');
+            pts.forEach(pt => {
+                let p = pt.split(',');
+                if(p.length === 2) {
+                    routePoints.push([parseFloat(p[0]), parseFloat(p[1])]);
+                    polyline.addLatLng([parseFloat(p[0]), parseFloat(p[1])]);
+                }
+            });
+
+            totalKm = parseFloat(s.km);
+            if(s.stops) stopIndexes = s.stops.split(',').map(Number);
+            
+            document.getElementById('km').innerText = s.km;
+            document.getElementById('duration').innerText = s.duration || "0m";
+            document.getElementById('townList').innerHTML = "📍 Loaded Saved Route";
+            
+            stopIndexes.forEach(idx => {
+                if(routePoints[idx]) {
+                    let m = L.circleMarker(routePoints[idx], {radius: 6, color: '#e74c3c', fillColor: '#fff', fillOpacity: 1}).addTo(map);
+                    stopMarkers.push(m);
+                }
+            });
+
+            map.fitBounds(polyline.getBounds());
+            alert(s.driver + " ගේ රූට් එක ලෝඩ් වුණා. START ඔබන්න.");
+        });
+    }
+
+    window.deleteRoute = function(id) { if(confirm("මෙම රූට් එක මකන්නද?")) db.ref('shared_routes/' + id).remove(); }
+    
     function clearRoute() {
+        if(isGhosting) { clearInterval(driveLoop); isGhosting = false; document.getElementById('ghostStatus').style.display = 'none'; }
         routePoints = []; polyline.setLatLngs([]); totalKm = 0; townNames = []; stopIndexes = [];
         document.getElementById('km').innerText = "0.00"; document.getElementById('duration').innerText = "0m";
         document.getElementById('townList').innerText = "පාර අඳින්න සිතියම මත ක්ලික් කරන්න...";
