@@ -61,7 +61,6 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script> 
 
 <script>
-    // 🔗 ඔයාගේ මුල් Firebase Config එක එලෙසම ඇත
     const firebaseConfig = {
         apiKey: "AIzaSyDP01tcjB5AVJ4G8jUv6eY2scc7O0y27qA",
         authDomain: "cococoin-mine.firebaseapp.com",
@@ -111,10 +110,18 @@
         }
     } 
 
+    // ⚡ [FIXED] - ලොකේෂන් Permission නැතත් සිතියම මත කෙලින්ම පාර ඇඳීමට සකස් කරන ලදී
     function handleMapInteraction(e) {
         if(!isDrawing || isGhosting) return;
         
-        let start = routePoints.length > 0 ? L.latLng(routePoints[routePoints.length - 1]) : (lastRealPos || e.latlng);
+        let start;
+        if (routePoints.length > 0) {
+            start = L.latLng(routePoints[routePoints.length - 1][0], routePoints[routePoints.length - 1][1]);
+        } else if (lastRealPos) {
+            start = lastRealPos;
+        } else {
+            start = e.latlng; // මුල්ම Point එක ක්ලික් කරපු තැනින්ම ගනී
+        }
         
         fetch(`https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${e.latlng.lng},${e.latlng.lat}?overview=full&geometries=geojson`)
         .then(res => res.json()).then(data => {
@@ -127,10 +134,9 @@
                 totalKm += data.routes[0].distance / 1000;
                 updateStats();
                 
-                // නැවතුමක් ලකුණු කිරීම
                 if(confirm("මෙම ස්ථානය නැවතුමක් (Stop) ලෙස ලකුණු කරනවාද?")) {
                     let lastIdx = routePoints.length - 1;
-                    stopIndices[lastIdx] = true; // ESP32 එකට හඳුනාගැනීමට Index එක සටහන් කරයි
+                    stopIndices[lastIdx] = true; 
                     
                     let mk = L.marker(e.latlng, {
                         icon: L.divIcon({className: 'stop-label', html: `STOP 🛑`})
@@ -138,6 +144,12 @@
                     stopMarkers.push(mk);
                 }
             }
+        }).catch(err => {
+            console.error("Routing Error: ", err);
+            // OSRM Error වුවහොත් direct ලයින් එකක් අඳියි
+            routePoints.push([e.latlng.lat, e.latlng.lng]);
+            polyline.addLatLng(e.latlng);
+            updateStats();
         });
     } 
 
@@ -154,18 +166,14 @@
         document.getElementById('startBtn').style.display = 'none';
         document.getElementById('stopBtn').style.display = 'inline-block';
         
-        // 💾 [SAVE TO FIREBASE] - 1. පොදු ලිස්ට් එකට සහ 2. දැනට දුවන වාහනයේ ට්‍රැක් එකට
         let ptsStr = routePoints.map(p => `${p[0]},${p[1]}`).join('|');
         let stopsStr = Object.keys(stopIndices).join(',');
         
-        // පොදු ලිස්ට් එකට සේව් කිරීම (ඕනෑම කෙනෙක්ට පසුව පාවිච්චි කිරීමට)
+        // 💾 Firebase එකට සේව් කිරීම
         let routeData = { name: rName, ptsStr: ptsStr, stops: stopsStr, km: totalKm.toFixed(2), timestamp: Date.now() };
         db.ref('shared_routes/global_history').push(routeData);
-        
-        // ESP32 එකට සහ මේ වාහනයට කෙලින්ම දත්ත යැවීම
         db.ref('shared_routes/last_route').set({ ptsStr: ptsStr, stops: stopsStr });
 
-        // 🚗 [SMOOTH GHOST DRIVE LOOP] - කඳුකර වේගය සහ සුමට ගලායාම
         let step = 0;
         let isWaiting = false;
         let waitCounter = 0;
@@ -176,7 +184,7 @@
                 document.getElementById('currentSpeedDisplay').innerText = `🛑 STOPPED`;
                 updateFirebase(routePoints[Math.floor(step)][0], routePoints[Math.floor(step)][1], false, "GHOST");
                 
-                if (waitCounter >= 6) { // තත්පර 5-8 අතර පොඩි නැවතීමේ කාලයක් (6 * 800ms = ~5 seconds)
+                if (waitCounter >= 6) { 
                     isWaiting = false;
                     waitCounter = 0;
                     step++;
@@ -189,19 +197,17 @@
                 ghostMarker.setLatLng(currentPos);
                 map.panTo(currentPos);
                 
-                // කඳුකර වේගය 15 ත් 35 ත් අතර Random වෙනස් කිරීම
+                // ⚡ [FIXED Typo] - කඳුකර වේගය නිවැරදිව පාලනය වේ
                 let randomSpeed = Math.floor(Math.random() * (35 - 15 + 1)) + 15;
                 document.getElementById('currentSpeedDisplay').innerText = `${randomSpeed} km/h`;
                 
-                // Firebase fleet එකට දත්ත යැවීම
-                updateFirebase(currentPos[0], currentPos[currentPos.length == 2 ? 1 : 0], true, "GHOST");
+                updateFirebase(currentPos[0], currentPos[1], true, "GHOST");
                 
-                // බස් හෝල්ට් එකක්දැයි පරීක්ෂා කිරීම
                 if (stopIndices[Math.floor(step)]) {
                     isWaiting = true;
-                    delete stopIndices[Math.floor(step)]; // එකම හෝල්ට් එකේ නැවත නැවත හිරවීම වැළැක්වීමට
+                    delete stopIndices[Math.floor(step)]; 
                 } else {
-                    step += 0.5; // සුමටව ගලා යන පියවර (Interpolation step)
+                    step += 0.5; 
                 }
             } else {
                 stopGhostDrive();
@@ -219,7 +225,6 @@
         document.getElementById('currentSpeedDisplay').innerText = `0 km/h`;
         document.getElementById('townList').innerText = "Real Location මාදිලිය ක්‍රියාත්මකයි.";
         
-        // රූට් එක ඉවර වුණාම ආයෙත් Real GPS එක පෙන්වීමට මාරු වීම
         if(lastRealPos) {
             ghostMarker.setLatLng(lastRealPos);
             updateFirebase(lastRealPos.lat, lastRealPos.lng, false, "REAL");
@@ -242,10 +247,17 @@
                 map.setView(e.latlng, 15);
             }
             realMarker.setLatLng(e.latlng);
-            // රූට් එකක් දුවන්නේ නැති වෙලාවට Real Location එක පෙන්වීම
             if (!isGhosting) {
                 ghostMarker.setLatLng(e.latlng);
                 updateFirebase(e.latlng.lat, e.latlng.lng, false, "REAL");
+            }
+        });
+        
+        map.on('locationerror', function() {
+            console.log("GPS Location Access Denied or Not Found.");
+            if(!realMarker) {
+                // GPS වැඩ නැත්නම් Default කොළඹට සෙට් වෙයි, හැබැයි පාරවල් අඳින්න පුළුවන්
+                ghostMarker = L.marker([6.9271, 79.8612]).addTo(map).bindTooltip(driverID, {permanent: true, direction: 'top'});
             }
         });
     } 
@@ -261,12 +273,11 @@
         location.reload();
     } 
 
-    // 🔄 [LOAD FROM FIREBASE] - පොදු ලිස්ට් එක කියවා වෙබ් එකේ පෙන්වීම සහ නැවත පාවිච්චියට ගැනීම
     function listenToNetwork() {
         db.ref('shared_routes/global_history').limitToLast(15).on('value', (snap) => {
             const listPanel = document.getElementById('historyList');
             if(!snap.exists()) {
-                listPanel.innerHTML = "පරණ රූට්ස් කිසිවක් හමුනොවුණි.";
+                listPanel.innerHTML = "පරණ ਰූට්ස් කිසිවක් හමුනොවුණි.";
                 return;
             }
             
@@ -277,25 +288,20 @@
                 item.className = "history-item";
                 item.innerHTML = `<span>📍 <b>${data.name}</b> (${data.km} KM)</span> <span style="color:#27ae60;">LOAD</span>`;
                 
-                // පරණ පාරක් ක්ලික් කළ විට එය නැවත මැප් එකට ලෝඩ් කිරීම
                 item.onclick = function() {
-                    if (isGhosting) return alert("ධාවනය වන අතරතුර වෙනත් රූට්ස් ලෝඩ් කළ නොහැක!");
+                    if (isGhosting) return alert("ධාවනය වන අතරතුර වෙනත් ਰූට්ස් ලෝඩ් කළ නොහැක!");
                     clearRouteWithoutReload();
                     
                     document.getElementById('routeName').value = data.name;
                     totalKm = parseFloat(data.km);
                     
-                    // String එක ආපහු Arrays වලට හැරවීම
                     let pts = data.ptsStr.split('|');
                     pts.forEach(p => {
                         let parts = p.split(',');
-                        let lat = parseFloat(parts[0]);
-                        let lng = parseFloat(parts[1]);
-                        routePoints.push([lat, lng]);
-                        polyline.addLatLng([lat, lng]);
+                        routePoints.push([parseFloat(parts[0]), parseFloat(parts[1])]);
+                        polyline.addLatLng([parseFloat(parts[0]), parseFloat(parts[1])]);
                     });
                     
-                    // ස්ටොප් ලකුණු කිරීම
                     if (data.stops) {
                         let stops = data.stops.split(',');
                         stops.forEach(idx => {
